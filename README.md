@@ -1,36 +1,230 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# منصة استشارات أ. علي هشام — التعليم والهجرة والفرص الدولية
+### Professional Online Consultation & Management Platform (SaaS / CRM)
 
-## Getting Started
+---
 
-First, run the development server:
+## 🌟 نظرة عامة على المشروع
 
+منصة برمجية متكاملة للإنتاج الفعلي (**Production-Ready SaaS Platform**) مصممة خصيصًا للأستاذ **علي هشام** وفريقه الاستشاري، لتقديم استشارات احترافية متخصصة ومبنية على دراسة حالة فردية في مجالات:
+- المنح الدراسية والدراسة الجامعية في الخارج (أوروبا، بريطانيا، كندا، أمريكا).
+- استشارات الهجرة القانونية ومسارات التأشيرات وتصاريح العمل.
+- مراجعة الملفات الأكاديمية وخطابات النوايا والسيرة الذاتية (SOP / CV).
+- الاعتراف بالشهادات ومعادلتها والمفاضلات الأكاديمية والمهنية.
+
+تم بناء المنصة بأعلى معايير الأمان وقواعد الأعمال الدقيقة، مع واجهة مستخدم عربية بالكامل (**RTL First**) وجمالية عصرية فخمة تعتمد خط **Cairo**، ولوحة ألوان متناسقة، ودعم شاشات الهواتف والحواسيب.
+
+---
+
+## 🏗️ البنية التقنية (Technology Stack)
+
+- **Framework**: [Next.js 16 (App Router)](https://nextjs.org/) مع React 19 و Server Components.
+- **Language**: TypeScript مع `Strict Mode` الكامل.
+- **Styling**: Tailwind CSS مع لوحة ألوان راقية ودعم كامل للاتجاه العربي `dir="rtl"`.
+- **Database**: PostgreSQL 18 مع [Prisma ORM 6.4](https://www.prisma.io/).
+- **Authentication**: JWT مشفر بـ `jose` (HS256) مع HttpOnly Cookies ونظام صلاحيات صارم قائم على الأدوار (**RBAC**).
+- **Security**: تشفير كلمات المرور باستخدام `bcryptjs`، حماية التنزيلات عبر خادم التفويض، وعزل سجلات المستشارين.
+- **Integrations**:
+  - **Google Calendar & Google Meet API**: إنشاء الاجتماعات تلقائيًا وتحديث المواعيد عند إعادة الجدولة.
+  - **Telegram Bot**: تنبيهات فورية للإدارة عند الحجوزات ورفع إيصالات الدفع.
+  - **SMTP Email Engine**: إرسال رسائل HTML مصممة لتأكيد الحجز، التذكيرات، وروابط دراسات الحالة.
+- **Job Processing**: نظام مهام خلفية مع معالجة الأخطاء والتكرار الآمن (**Idempotency**).
+- **Testing**: [Vitest](https://vitest.dev/) مع اختبارات شاملة للمنطق البرمجي وقواعد الأمان.
+
+---
+
+## 📋 ميزات المنصة الرئيسية
+
+### 1. الموقع العام (Landing Page)
+يتضمن 16 قسمًا تفاعليًا مبنيًا وفق المواصفات المعتمدة:
+1. **Hero Section**: عنوان قوي، شارات الثقة، وأزرار توجيه واضحة لحجز الموعد.
+2. **شريط التنبيه المالي**: توضيح نظام الدفع المسبق لضمان جدية المواعيد.
+3. **نبذة عن المستشار أ. علي هشام**: مسيرته وخبراته مع إحصائيات واقعية.
+4. **المجالات الاستشارية (Specialties)**: استعراض 6 تخصصات مدعومة ببيانات حية من PostgreSQL.
+5. **كيف تعمل المنصة (How It Works)**: خطوات واضحة (اختيار الخدمة -> حجز الموعد -> سداد الرسوم -> لقاء Google Meet).
+6. **فريق المستشارين**: عرض بطاقات المستشارين مع السير الذاتية ومجالات التخصص.
+7. **نظام التوزيع الذكي (Auto-Assign)**: إمكانية اختيار مستشار محدد أو التوزيع التلقائي للأسرع توفرًا.
+8. **باقات الخدمات والأسعار**:
+   - **جلسة سريعة**: 10 دقائق ($15) للإجابة المباشرة عن سؤال محدد.
+   - **جلسة تخصصية**: 30 دقيقة ($50) لاستشارة معمقة ونقاش تفصيلي.
+   - **جلسة شاملة + خارطة طريق**: 60 دقيقة ($200) تشمل دراسة حالة كاملة وتجهيز ملف PDF مخصص.
+9. **قسم دراسة الحالة الفردية ($200)**: إبراز القيمة الاستثنائية للملف التنفيذي المكتوب.
+10. **آراء العملاء وتقييماتهم**: عرض التقييمات المعتمدة من الإدارة.
+11. **الأسئلة الشائعة (FAQ)**: نظام Accordion تفاعلي يجيب عن الاستفسارات المالية والتنظيمية.
+12. **طرق الدفع اليدوية**: عرض الحسابات البنكية (بنك فلسطين، Payoneer، PayPal، USDT، إلخ).
+13. **دعوة أخيرة للحجز (CTA)**.
+14. **زر واتساب العائم**: للتواصل الفوري السريع.
+15. **التذييل القانوني (Footer)**: يحتوي على إخلاء المسؤولية القانوني وحقوق الملكية.
+
+---
+
+### 2. محرك الحجز وحجز المواعيد (Booking Engine)
+- مسار حجز ديناميكي من 5 خطوات مع مؤشر تقدم تفاعلي.
+- حساب المواعيد المتاحة لكل مستشار في الوقت الفعلي مع مراعاة فترات الراحة وأيام الإجازات.
+- **قفل الموعد المؤقت (`slot_expires_at`)**: يتم حجز الموعد لمدة ساعتين بانتظار رفع إثبات الدفع.
+- **إلغاء القفل التلقائي**: تحرير الموعد تلقائيًا إذا انقضت المهلة دون رفع الإيصال.
+- **حماية الموعد بعد رفع الإيصال**: لا يتم تحرير الموعد إطلاقًا بعد رفع الإيصال إلا بقرار رسمي من الإدارة.
+- **دعم المناطق الزمنية**: تخزين جميع المواعيد داخليًا بصيغة UTC وعرضها للمستخدم بحسب منطقته الزمنية (IANA Timezones).
+
+---
+
+### 3. مسار إثبات الدفع وتتبع الحجز (Customer Tracker)
+- صفحة تتبع عامة لكل حجز برمز مرجعي فريد (`/booking/[id]`).
+- مؤشر عد تنازلي حي لمهلة السداد.
+- نموذج رفع إيصال الدفع مع معاينة الصورة ورقم الحوالة والملاحظات.
+- ظهور رابط **Google Meet** فور تأكيد الحجز من الإدارة.
+- زر تنزيل **خارطة الطريق الاستشارية** (لحجوزات باقة $200) فور صدورها.
+
+---
+
+### 4. لوحة تحكم الإدارة (Admin Dashboard)
+- **نظرة عامة وإحصائيات**: إجمالي الحجوزات، المواعيد القادمة، إيصالات قيد المراجعة، الإيرادات المؤكدة.
+- **إدارة الحجوزات (CRM)**: تصفية متقدمة بحسب الحالة، الخدمة، والمستشار، مع بحث بالاسم ورقم الحجز.
+- **اعتماد / رفض إيصالات الدفع**:
+  - عمليات اعتماد قطعية وآمنة ضد التكرار (**Idempotent**).
+  - إنشاء وتزامن رابط Google Meet عبر Google Calendar API.
+  - إرسال بريد إلكتروني تلقائي للعميل وتنبيه المستشار المعني.
+- **إدارة المستشارين**: إضافة وتعديل حسابات المستشارين وقواعد توافرهم.
+- **إدارة الخدمات والتخصصات والأسئلة الشائعة**: تحكم كامل بمحتوى الموقع.
+- **مركز اختبار التكاملات**: لوحة لاختبار إشعارات بوت Telegram وخادم SMTP Email مباشرة.
+- **سجل التدقيق والأمان (Audit Log)**: تسجيل كل عملية وصول للملفات الحساسة والتعديلات الإدارية.
+
+---
+
+### 5. بوابة المستشار (Consultant Portal)
+- جدول مواعيد مخصص لكل مستشار (`/consultant`).
+- عزل كامل للبيانات: المستشار لا يرى سوى الحجوزات المسندة إليه.
+- عرض الملفات الأكاديمية والوثائق المرفوعة من العميل لكل جلسة.
+- تدوين الملاحظات التقييمية للجلسة.
+- **نظام تسليم خارطة الطريق ($200)**: واجهة لرفع ملف PDF لدراسة الحالة، وإنشاء رمز تنزيل محمي، وإرساله فورًا للعميل عبر البريد الإلكتروني.
+
+---
+
+### 6. نظام الأمان وحماية الملفات
+- تخزين وثائق العملاء في مجلد خاص محمي (`uploads/documents/`).
+- لا يمكن تنزيل أي وثيقة إلا عبر نقطة النهاية المعتمدة `/api/documents/download`.
+- التحقق الإلزامي من جلسة المستخدم (Admin أو المستشار المسند إليه الحجز فقط).
+- تسجيل تفاصيل كل عملية تنزيل (المستخدم، المعرف، عنوان IP، والوقت) في جدول `AuditLog`.
+- منع إرسال وثائق العملاء الشخصية أو الحساسة عبر Telegram للحفاظ على الخصوصية.
+
+---
+
+## 🚀 دليل التثبيت والتشغيل المحلي
+
+### 1. المتطلبات الأساسية
+- **Node.js**: الإصدار 18 أو أحدث (يوصى بـ LTS).
+- **PostgreSQL**: الإصدار 14 أو أحدث يعمل محليًا أو سحابيًا.
+- **npm** أو **pnpm**.
+
+### 2. استنساخ المشروع وتثبيت الحزم
 ```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+cd "d:\مشااريع برمحيه\استشارات مسارات غزة"
+npm install --legacy-peer-deps
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+### 3. إعداد متغيرات البيئة (`.env`)
+قم بنسخ ملف `.env.example` إلى `.env` واملأ المتغيرات المطلوبة:
+```bash
+cp .env.example .env
+```
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+محتويات ملف `.env`:
+```env
+# قاعدة البيانات PostgreSQL
+DATABASE_URL="postgresql://postgres:123456@127.0.0.1:5432/masarat_consultations?schema=public"
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+# الجلسات والأمان
+SESSION_SECRET="your-super-secret-jwt-key-at-least-32-chars-long"
 
-## Learn More
+# رابط المنصة
+NEXT_PUBLIC_APP_URL="http://localhost:3000"
 
-To learn more about Next.js, take a look at the following resources:
+# خدمة البريد الإلكتروني SMTP
+SMTP_HOST="smtp.gmail.com"
+SMTP_PORT="587"
+SMTP_USER="your-email@gmail.com"
+SMTP_PASS="your-app-password"
+SMTP_FROM_EMAIL="consultations@alihisham.com"
+SMTP_FROM_NAME="أ. علي هشام للاستشارات"
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+# بوت Telegram
+TELEGRAM_BOT_TOKEN="your_bot_token_from_botfather"
+TELEGRAM_ADMIN_CHAT_ID="your_telegram_chat_id"
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+# تكامل Google Calendar & Meet
+GOOGLE_CLIENT_ID="your-google-oauth-client-id"
+GOOGLE_CLIENT_SECRET="your-google-oauth-client-secret"
+GOOGLE_REDIRECT_URI="http://localhost:3000/api/auth/google/callback"
+GOOGLE_REFRESH_TOKEN="your-google-refresh-token"
+GOOGLE_CALENDAR_ID="primary"
 
-## Deploy on Vercel
+# المهام المجدولة (Cron)
+CRON_SECRET="your-cron-secret-for-scheduled-jobs"
+```
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+### 4. ترحيل قاعدة البيانات وملء البيانات الأولية (Migrations & Seed)
+```bash
+# إنشاء وتطبيق جداول قاعدة البيانات
+npm run db:migrate
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+# توليد عميل Prisma
+npm run db:generate
+
+# زراعة البيانات الأولية (المسؤول، المستشار، الخدمات، الأسئلة الشائعة)
+npm run db:seed
+```
+
+### 5. الحسابات الافتراضية بعد التغذية الأولية (Seed Data)
+| الدور (Role) | البريد الإلكتروني | كلمة المرور |
+| :--- | :--- | :--- |
+| **مدير النظام (Super Admin)** | `admin@alihisham.com` | `Admin@123456` |
+| **المستشار الرئيسي (أ. علي هشام)** | `ali@alihisham.com` | `Consultant@123456` |
+
+---
+
+## 🧪 تشغيل الاختبارات وفحص الكود
+
+### تشغيل اختبارات Vitest
+```bash
+npm run test
+```
+
+### التحقق من جودة الكود والأنماط (TypeScript & Lint)
+```bash
+npx tsc --noEmit
+npm run lint
+```
+
+### بناء وتجهيز تطبيق الإنتاج (Production Build)
+```bash
+npm run build
+npm run start
+```
+
+---
+
+## ⏰ إعداد المهام المجدولة (Cron Jobs)
+
+المنصة مزودة بمسار خاص لمعالجة التذكيرات وإلغاء حجز المواعيد المنتهية صلاحيتها:
+- **المسار**: `/api/cron/reminders`
+- **طريقة الاستدعاء**: طلب `GET` دوري (كل 5 إلى 15 دقيقة) مع ترويسة التفويض:
+```bash
+curl -H "Authorization: Bearer YOUR_CRON_SECRET" https://yourdomain.com/api/cron/reminders
+```
+**المهام المنفذة تلقائيًا**:
+1. إرسال بريد تذكيري قبل 24 ساعة من موعد الاستشارة.
+2. إرسال بريد تذكيري قبل ساعة واحدة من موعد الاستشارة متضمنًا رابط Google Meet.
+3. تحرير المواعيد غير المدفوعة التي تجاوزت `slot_expires_at` دون رفع إيصال دفع.
+
+---
+
+## 🛡️ قواعد معمارية هامة تم تطبيقها
+
+1. **Idempotent Transactions**: جميع العمليات المالية والمصيرية، خصوصًا `Confirm Payment`، تستخدم Prisma Interactive Transactions ولا تكرر إنشاء الفعاليات أو تغيير الحالات في حال استدعائها أكثر من مرة.
+2. **Resilience & Non-blocking Integrations**: في حال انقطاع خدمة Google Calendar أو SMTP أو Telegram، لا يتم إفشال تسجيل الحجز أو اعتماد الدفع؛ بل يُسجل الخطأ في السجل وتُكمل العملية الأساسية بنجاح.
+3. **UTC Everywhere**: تخزين كافة المواعيد في PostgreSQL بصيغة UTC القياسية، بينما يتم التحويل وعرض التوقيت للعميل وفق منطقته الجغرافية المسجلة.
+4. **Data Isolation**: المستشار لا يستطيع الوصول إلا للحجوزات والوثائق الخاصة بالعملاء المسندين إليه، وتتحقق الـ API من هوية وصلاحيات كل طلب بصورة مستقلة.
+
+---
+
+## 📄 حقوق النشر والترخيص
+جميع حقوق التطوير والتصميم محفوظة لمنصة **أ. علي هشام — استشارات متخصصة في التعليم والهجرة والفرص الدولية**.
