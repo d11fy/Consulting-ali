@@ -76,43 +76,37 @@ export function FAQSection({ faqs }: FAQSectionProps) {
             return (
               <div
                 key={f.id}
-                className={`glass-panel rounded-2xl border transition-all duration-300 overflow-hidden ${
+                onClick={() => toggleItem(f.id)}
+                className={`rounded-2xl border transition-all duration-300 overflow-hidden cursor-pointer select-none ${
                   isOpen
-                    ? 'border-emerald-500/40 bg-slate-900/90 shadow-lg shadow-emerald-500/5'
-                    : 'border-slate-800 bg-slate-900/40 hover:border-slate-700 hover:bg-slate-900/60'
+                    ? 'border-emerald-500/50 bg-slate-900/90 shadow-xl shadow-emerald-500/10 ring-1 ring-emerald-500/30'
+                    : 'border-slate-800 bg-slate-900/40 hover:border-slate-700 hover:bg-slate-900/70'
                 }`}
               >
-                <button
-                  type="button"
-                  onClick={() => toggleItem(f.id)}
-                  aria-expanded={isOpen}
-                  className="w-full p-5 sm:p-6 text-right flex items-center justify-between gap-4 transition-colors cursor-pointer select-none focus:outline-none"
-                >
-                  <span className={`text-sm sm:text-base font-bold transition-colors ${isOpen ? 'text-emerald-400' : 'text-white'}`}>
+                <div className="w-full p-5 sm:p-6 text-right flex items-center justify-between gap-4">
+                  <span
+                    className={`text-sm sm:text-base font-bold transition-colors ${
+                      isOpen ? 'text-emerald-400' : 'text-white'
+                    }`}
+                  >
                     {f.questionAr}
                   </span>
                   <div
                     className={`p-2 rounded-xl border shrink-0 transition-all duration-300 ${
                       isOpen
-                        ? 'rotate-180 text-emerald-400 border-emerald-500/40 bg-emerald-950/60'
+                        ? 'rotate-180 text-emerald-400 border-emerald-500/40 bg-emerald-950/80 shadow-md'
                         : 'text-slate-400 border-slate-800 bg-slate-900/80'
                     }`}
                   >
                     <ChevronDown className="w-4 h-4" />
                   </div>
-                </button>
-
-                <div
-                  className={`grid transition-all duration-300 ease-in-out ${
-                    isOpen ? 'grid-rows-[1fr] opacity-100' : 'grid-rows-[0fr] opacity-0'
-                  }`}
-                >
-                  <div className="overflow-hidden">
-                    <div className="px-5 sm:px-6 pb-6 text-xs sm:text-sm text-slate-300 leading-relaxed border-t border-slate-800/60 pt-4">
-                      {f.answerAr}
-                    </div>
-                  </div>
                 </div>
+
+                {isOpen && (
+                  <div className="px-5 sm:px-6 pb-6 text-xs sm:text-sm text-slate-300 leading-relaxed border-t border-slate-800/80 pt-4 bg-slate-950/40 animate-fadeIn">
+                    {f.answerAr}
+                  </div>
+                )}
               </div>
             );
           })}
