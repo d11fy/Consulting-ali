@@ -9,7 +9,7 @@ function getSecretKey(): Uint8Array {
   return new TextEncoder().encode(secret);
 }
 
-export async function middleware(request: NextRequest) {
+export async function proxy(request: NextRequest) {
   const { pathname } = request.nextUrl;
   const sessionCookie = request.cookies.get(SESSION_COOKIE_NAME)?.value;
 
@@ -70,6 +70,8 @@ export async function middleware(request: NextRequest) {
 
   return response;
 }
+
+export { proxy as middleware };
 
 export const config = {
   matcher: ['/admin/:path*', '/consultant/:path*', '/login'],
