@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import prisma from '@/lib/db/prisma';
 import fs from 'fs/promises';
 import path from 'path';
+import os from 'os';
 import crypto from 'crypto';
 import { BookingStatus, PaymentStatus } from '@prisma/client';
 
@@ -107,17 +108,35 @@ export async function POST(
       }
     }
 
-    // Save receipt file securely
+    // Read file bytes
     const bytes = await receiptFile.arrayBuffer();
     const buffer = Buffer.from(bytes);
 
+    // Primary Vercel-compatible storage format: Data URL (Base64)
+    const mimeType = receiptFile.type || 'image/png';
+    const dataUrl = `data:${mimeType};base64,${buffer.toString('base64')}`;
+
+    let targetFilePath = dataUrl;
     const safeName = `receipt_${Date.now()}_${crypto.randomBytes(12).toString('hex')}${ext}`;
 
-    const receiptDir = path.join(process.cwd(), 'uploads', 'receipts');
-    await fs.mkdir(receiptDir, { recursive: true });
-
-    const targetPath = path.join(receiptDir, safeName);
-    await fs.writeFile(targetPath, buffer);
+    // Try saving to disk (local environment or persistent servers)
+    try {
+      const receiptDir = path.join(process.cwd(), 'uploads', 'receipts');
+      await fs.mkdir(receiptDir, { recursive: true });
+      const diskPath = path.join(receiptDir, safeName);
+      await fs.writeFile(diskPath, buffer);
+      targetFilePath = diskPath;
+    } catch {
+      // Serverless (Vercel): Try /tmp directory as backup
+      try {
+        const tmpDir = path.join(os.tmpdir(), 'receipts');
+        await fs.mkdir(tmpDir, { recursive: true });
+        const tmpPath = path.join(tmpDir, safeName);
+        await fs.writeFile(tmpPath, buffer);
+      } catch {
+        // Fallback remains dataUrl
+      }
+    }
 
     const paymentDate = paymentDateStr ? new Date(paymentDateStr) : new Date();
     const amount = amountStr ? parseFloat(amountStr) : payment.amount;
@@ -133,9 +152,9 @@ export async function POST(
           currency,
           transactionNumber: transactionNumber ? transactionNumber.trim() : null,
           paymentDate,
-          receiptFilePath: targetPath,
+          receiptFilePath: targetFilePath,
           receiptFileName: receiptFile.name,
-          fileMime: receiptFile.type || 'image/png',
+          fileMime: mimeType,
           fileSize: receiptFile.size,
           notes: notes || null,
           status: 'pending',

@@ -6,6 +6,7 @@ import crypto from 'crypto';
 
 const ALLOWED_IMAGE_TYPES = [
   'image/jpeg',
+  'image/jpg',
   'image/png',
   'image/webp',
   'image/gif',
@@ -53,16 +54,22 @@ export async function POST(req: NextRequest) {
       else ext = '.png';
     }
 
-    const safeBaseName = crypto.randomBytes(12).toString('hex');
-    const fileName = `consultant_${Date.now()}_${safeBaseName}${ext}`;
+    const mimeType = file.type || 'image/png';
+    const base64Url = `data:${mimeType};base64,${buffer.toString('base64')}`;
+    let publicUrl = base64Url;
 
-    const uploadDir = path.join(process.cwd(), 'public', 'uploads', 'consultants');
-    await fs.mkdir(uploadDir, { recursive: true });
+    try {
+      const safeBaseName = crypto.randomBytes(12).toString('hex');
+      const fileName = `consultant_${Date.now()}_${safeBaseName}${ext}`;
+      const uploadDir = path.join(process.cwd(), 'public', 'uploads', 'consultants');
+      await fs.mkdir(uploadDir, { recursive: true });
 
-    const filePath = path.join(uploadDir, fileName);
-    await fs.writeFile(filePath, buffer);
-
-    const publicUrl = `/uploads/consultants/${fileName}`;
+      const filePath = path.join(uploadDir, fileName);
+      await fs.writeFile(filePath, buffer);
+      publicUrl = `/uploads/consultants/${fileName}`;
+    } catch {
+      // Fallback to data URL on read-only serverless platforms like Vercel
+    }
 
     return NextResponse.json({
       success: true,

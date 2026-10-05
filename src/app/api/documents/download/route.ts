@@ -2,7 +2,6 @@ import { NextRequest, NextResponse } from 'next/server';
 import prisma from '@/lib/db/prisma';
 import { getCurrentSession } from '@/lib/auth/session';
 import fs from 'fs/promises';
-import path from 'path';
 
 export async function GET(request: NextRequest) {
   try {
@@ -28,11 +27,25 @@ export async function GET(request: NextRequest) {
         return NextResponse.json({ success: false, error: 'الإيصال غير موجود' }, { status: 404 });
       }
 
-      const fileBuffer = await fs.readFile(proof.receiptFilePath);
+      let fileBuffer: Buffer;
+      const mime = proof.fileMime || 'image/jpeg';
+
+      if (proof.receiptFilePath.startsWith('data:')) {
+        const matches = proof.receiptFilePath.match(/^data:(.+);base64,(.+)$/);
+        const base64Data = matches ? matches[2] : proof.receiptFilePath.replace(/^data:[^;]+;base64,/, '');
+        fileBuffer = Buffer.from(base64Data, 'base64');
+      } else {
+        try {
+          fileBuffer = await fs.readFile(proof.receiptFilePath);
+        } catch {
+          return NextResponse.json({ success: false, error: 'تعذر العثور على ملف الإيصال المخزن' }, { status: 404 });
+        }
+      }
+
       const headers = new Headers();
-      headers.set('Content-Type', proof.fileMime || 'image/jpeg');
+      headers.set('Content-Type', mime);
       headers.set('Content-Disposition', `inline; filename="${encodeURIComponent(proof.receiptFileName)}"`);
-      return new NextResponse(fileBuffer, { status: 200, headers });
+      return new NextResponse(new Uint8Array(fileBuffer), { status: 200, headers });
     }
 
     // 1. If download token is provided (e.g. for Roadmap download by client)
@@ -80,8 +93,6 @@ export async function GET(request: NextRequest) {
       }
 
       // Check RBAC permission:
-      // Super Admin and Admin can access all files.
-      // Consultant can only access if linked to one of the bookings.
       if (session.role === 'CONSULTANT') {
         const isLinkedToConsultant = document.bookings.some(
           (b: any) => b.booking.consultantId === session.consultantId
@@ -106,8 +117,14 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ success: false, error: 'معرف الملف غير محدد' }, { status: 400 });
     }
 
-    // Stream file securely from local storage
-    const fileBuffer = await fs.readFile(document.filePath);
+    let fileBuffer: Buffer;
+    if (document.filePath.startsWith('data:')) {
+      const matches = document.filePath.match(/^data:(.+);base64,(.+)$/);
+      const base64Data = matches ? matches[2] : document.filePath.replace(/^data:[^;]+;base64,/, '');
+      fileBuffer = Buffer.from(base64Data, 'base64');
+    } else {
+      fileBuffer = await fs.readFile(document.filePath);
+    }
 
     const headers = new Headers();
     headers.set('Content-Type', document.mimeType);
@@ -115,9 +132,9 @@ export async function GET(request: NextRequest) {
       'Content-Disposition',
       `attachment; filename="${encodeURIComponent(document.originalName)}"`
     );
-    headers.set('Content-Length', document.sizeBytes.toString());
+    headers.set('Content-Length', fileBuffer.length.toString());
 
-    return new NextResponse(fileBuffer, {
+    return new NextResponse(new Uint8Array(fileBuffer), {
       status: 200,
       headers,
     });

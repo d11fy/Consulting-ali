@@ -48,12 +48,18 @@ export async function POST(request: NextRequest) {
     const safeBaseName = crypto.randomBytes(16).toString('hex');
     const storedFileName = `${safeBaseName}${ext}`;
 
-    // Target directory
-    const uploadDir = path.join(process.cwd(), 'uploads', 'documents');
-    await fs.mkdir(uploadDir, { recursive: true });
+    // Base64 data URL for Vercel/serverless environments where disk is read-only
+    let targetFilePath = `data:${file.type};base64,${buffer.toString('base64')}`;
 
-    const targetFilePath = path.join(uploadDir, storedFileName);
-    await fs.writeFile(targetFilePath, buffer);
+    try {
+      const uploadDir = path.join(process.cwd(), 'uploads', 'documents');
+      await fs.mkdir(uploadDir, { recursive: true });
+      const diskPath = path.join(uploadDir, storedFileName);
+      await fs.writeFile(diskPath, buffer);
+      targetFilePath = diskPath;
+    } catch {
+      // Fallback to data URL on serverless
+    }
 
     // Save Document in DB
     const doc = await prisma.document.create({
