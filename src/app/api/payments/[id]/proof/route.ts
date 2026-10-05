@@ -7,9 +7,17 @@ import { BookingStatus, PaymentStatus } from '@prisma/client';
 
 const ALLOWED_RECEIPT_MIMES = [
   'image/jpeg',
+  'image/jpg',
+  'image/pjpeg',
   'image/png',
+  'image/x-png',
   'image/webp',
+  'image/heic',
+  'image/heif',
+  'image/bmp',
+  'image/gif',
   'application/pdf',
+  'application/octet-stream',
 ];
 
 export async function POST(
@@ -49,7 +57,7 @@ export async function POST(
     }
 
     const formData = await request.formData();
-    const senderName = formData.get('senderName') as string;
+    const rawSenderName = formData.get('senderName') as string;
     const paymentMethodId = formData.get('paymentMethodId') as string;
     const amountStr = formData.get('amount') as string;
     const currency = (formData.get('currency') as string) || 'USD';
@@ -58,26 +66,52 @@ export async function POST(
     const notes = (formData.get('notes') as string) || '';
     const receiptFile = formData.get('receipt') as File | null;
 
-    if (!senderName || !paymentMethodId || !receiptFile) {
+    const senderName = rawSenderName?.trim() || payment.booking.customer.fullName;
+
+    if (!receiptFile) {
       return NextResponse.json(
-        { success: false, error: 'يرجى إدخال اسم المحول، واختيار طريقة الدفع، وإرفاق صورة الإشعار' },
+        { success: false, error: 'يرجى إرفاق صورة الإشعار أو ملف PDF' },
         { status: 400 }
       );
     }
 
-    if (!ALLOWED_RECEIPT_MIMES.includes(receiptFile.type)) {
+    // Flexible MIME type & Extension check
+    const ext = path.extname(receiptFile.name).toLowerCase() || '.jpg';
+    const allowedExtensions = ['.jpg', '.jpeg', '.png', '.webp', '.pdf', '.heic', '.heif', '.bmp', '.gif'];
+    const isAllowedExt = allowedExtensions.includes(ext);
+    const isAllowedMime =
+      receiptFile.type.startsWith('image/') ||
+      receiptFile.type === 'application/pdf' ||
+      ALLOWED_RECEIPT_MIMES.includes(receiptFile.type);
+
+    if (!isAllowedExt && !isAllowedMime) {
       return NextResponse.json(
-        { success: false, error: 'صيغة الإشعار غير مدعومة. يرجى رفع صورة (JPG, PNG) أو ملف PDF.' },
+        { success: false, error: 'صيغة الإشعار غير مدعومة. يرجى رفع صورة (JPG, PNG, WebP) أو ملف PDF.' },
         { status: 400 }
       );
+    }
+
+    // Safely check if paymentMethodId exists in DB
+    let validPaymentMethodId: string | null = null;
+    if (paymentMethodId) {
+      const pm = await prisma.paymentMethod.findFirst({
+        where: {
+          OR: [
+            { id: paymentMethodId },
+            { code: paymentMethodId },
+          ],
+        },
+      });
+      if (pm) {
+        validPaymentMethodId = pm.id;
+      }
     }
 
     // Save receipt file securely
     const bytes = await receiptFile.arrayBuffer();
     const buffer = Buffer.from(bytes);
 
-    const ext = path.extname(receiptFile.name) || '.jpg';
-    const safeName = `receipt_${crypto.randomBytes(16).toString('hex')}${ext}`;
+    const safeName = `receipt_${Date.now()}_${crypto.randomBytes(12).toString('hex')}${ext}`;
 
     const receiptDir = path.join(process.cwd(), 'uploads', 'receipts');
     await fs.mkdir(receiptDir, { recursive: true });
@@ -94,14 +128,14 @@ export async function POST(
       const proof = await tx.paymentProof.create({
         data: {
           paymentId: payment.id,
-          senderName: senderName.trim(),
+          senderName,
           amount,
           currency,
           transactionNumber: transactionNumber ? transactionNumber.trim() : null,
           paymentDate,
           receiptFilePath: targetPath,
           receiptFileName: receiptFile.name,
-          fileMime: receiptFile.type,
+          fileMime: receiptFile.type || 'image/png',
           fileSize: receiptFile.size,
           notes: notes || null,
           status: 'pending',
@@ -113,12 +147,11 @@ export async function POST(
         where: { id: payment.id },
         data: {
           status: PaymentStatus.uploaded,
-          paymentMethodId,
+          ...(validPaymentMethodId && { paymentMethodId: validPaymentMethodId }),
         },
       });
 
       // 3. Update Booking Status
-      // Rule: Once payment proof is uploaded, slot is locked and not auto-released until admin decides.
       await tx.booking.update({
         where: { id: payment.bookingId },
         data: {
@@ -140,7 +173,7 @@ export async function POST(
       return proof;
     });
 
-    // Queue Telegram notification to admins
+    // Queue notifications to admins
     try {
       await prisma.jobQueue.create({
         data: {
@@ -158,7 +191,6 @@ export async function POST(
         },
       });
 
-      // In-app admin notification
       await prisma.notification.create({
         data: {
           recipientType: 'admin',
@@ -177,10 +209,10 @@ export async function POST(
       message: 'تم رفع إشعار الدفع بنجاح وهو قيد المراجعة والتحقق.',
       proofId: updatedData.id,
     });
-  } catch (error) {
+  } catch (error: any) {
     console.error('Error uploading payment proof:', error);
     return NextResponse.json(
-      { success: false, error: 'حدث خطأ أثناء حفظ إثبات الدفع' },
+      { success: false, error: error?.message || 'حدث خطأ أثناء حفظ إثبات الدفع' },
       { status: 500 }
     );
   }
