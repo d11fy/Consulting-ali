@@ -31,7 +31,7 @@ export function ConsultantSidebar({ userName, userTitle, userEmail }: Consultant
     { name: 'استشاراتي والعملاء', href: '/consultant/bookings', icon: Users },
     { name: 'خوارط الطريق ($200)', href: '/consultant/roadmaps', icon: FileText },
     { name: 'أوقات العمل والإجازات', href: '/consultant/availability', icon: Clock },
-    { name: 'ربط Google Calendar', href: '/consultant/calendar', icon: Calendar },
+    { name: 'ربط Google Calendar والتلجرام', href: '/consultant/calendar', icon: Calendar },
   ];
 
   const handleLogout = async () => {

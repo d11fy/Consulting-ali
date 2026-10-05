@@ -14,6 +14,10 @@ import {
   ChevronLeft,
   CheckCircle2,
   AlertCircle,
+  Bot,
+  Send,
+  Calendar,
+  Sparkles,
 } from 'lucide-react';
 
 export const dynamic = 'force-dynamic';
@@ -23,9 +27,22 @@ export default async function ConsultantDashboardPage() {
 
   const consultant = await prisma.consultant.findUnique({
     where: { userId: session.id },
+    include: {
+      googleConnection: true,
+    },
   });
 
   const consultantId = consultant?.id;
+
+  // Fetch integration settings
+  const siteSettings = await prisma.siteSetting.findMany({
+    where: { category: { in: ['telegram', 'google'] } },
+  });
+  const settingsMap = new Map(siteSettings.map((s) => [s.key, s.value]));
+  const telegramConfigured = Boolean(
+    settingsMap.get('telegram_bot_token') || process.env.TELEGRAM_BOT_TOKEN
+  );
+  const googleConnection = consultant?.googleConnection;
 
   // Fetch only this consultant's upcoming bookings
   const upcomingBookings = await prisma.booking.findMany({
@@ -73,6 +90,37 @@ export default async function ConsultantDashboardPage() {
         <p className="text-xs text-slate-400 mt-1">
           مرحبًا بك، استعرض جلساتك المجدولة وروابط الاجتماع والوثائق المرفوعة لكل حالة.
         </p>
+      </div>
+
+      {/* Integrations Banner */}
+      <div className="bg-gradient-to-r from-slate-900 via-slate-900 to-slate-950 border border-slate-800 rounded-3xl p-6 flex flex-col sm:flex-row sm:items-center justify-between gap-4 shadow-xl">
+        <div className="flex items-center gap-4">
+          <div className="w-12 h-12 rounded-2xl bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center text-emerald-400 shrink-0">
+            <Sparkles className="w-6 h-6" />
+          </div>
+          <div>
+            <h3 className="text-sm font-bold text-white flex items-center gap-2">
+              <span>مركز الربط والتكامل: Telegram & Google Calendar</span>
+            </h3>
+            <div className="flex items-center gap-4 text-xs text-slate-400 mt-1">
+              <span className="flex items-center gap-1.5">
+                <Bot className="w-3.5 h-3.5 text-sky-400" />
+                <span>إشعارات البوت: {telegramConfigured ? '🟢 جاهزة ومفعّلة' : '🟡 بانتظار الإعداد'}</span>
+              </span>
+              <span className="flex items-center gap-1.5">
+                <Calendar className="w-3.5 h-3.5 text-blue-400" />
+                <span>تقويم Google: {googleConnection?.syncStatus === 'active' ? '🟢 متصل ومزامن' : '🔵 متاح للربط'}</span>
+              </span>
+            </div>
+          </div>
+        </div>
+
+        <Link
+          href="/consultant/calendar"
+          className="px-5 py-2.5 rounded-2xl bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-bold text-xs shadow-md transition-all shrink-0 text-center"
+        >
+          إدارة وإعداد الربط بالتفصيل
+        </Link>
       </div>
 
       {/* Metrics Bar */}
