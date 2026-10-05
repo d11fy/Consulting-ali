@@ -14,14 +14,51 @@ import {
   ExternalLink,
   MessageSquare,
   Video,
+  Edit,
+  Trash2,
+  User,
+  Mail,
+  Phone,
+  Globe,
+  Briefcase,
+  FileText,
+  X,
+  Save,
 } from 'lucide-react';
 
 interface BookingDetailActionsProps {
   booking: any;
   consultants: { id: string; name: string }[];
+  services?: { id: string; nameAr: string; price: number }[];
 }
 
-export function BookingDetailActions({ booking, consultants }: BookingDetailActionsProps) {
+function toDatetimeLocal(isoString?: string | Date | null) {
+  if (!isoString) return '';
+  const d = new Date(isoString);
+  if (isNaN(d.getTime())) return '';
+  const pad = (n: number) => String(n).padStart(2, '0');
+  const y = d.getFullYear();
+  const m = pad(d.getMonth() + 1);
+  const day = pad(d.getDate());
+  const h = pad(d.getHours());
+  const min = pad(d.getMinutes());
+  return `${y}-${m}-${day}T${h}:${min}`;
+}
+
+const STATUS_OPTIONS = [
+  { value: 'pending_payment', label: 'بانتظار الدفع (pending_payment)' },
+  { value: 'payment_uploaded', label: 'تم رفع إشعار الدفع (payment_uploaded)' },
+  { value: 'payment_under_review', label: 'قيد مراجعة الدفع (payment_under_review)' },
+  { value: 'confirmed', label: 'مؤكد ومعتمد (confirmed)' },
+  { value: 'scheduled', label: 'مجدول (scheduled)' },
+  { value: 'completed', label: 'مكتمل بنجاح (completed)' },
+  { value: 'rescheduled', label: 'معاد جدولته (rescheduled)' },
+  { value: 'cancelled', label: 'ملغي (cancelled)' },
+  { value: 'no_show', label: 'لم يحضر العميل (no_show)' },
+  { value: 'refunded', label: 'مسترد (refunded)' },
+];
+
+export function BookingDetailActions({ booking, consultants, services = [] }: BookingDetailActionsProps) {
   const router = useRouter();
 
   const [loading, setLoading] = useState(false);
@@ -37,13 +74,24 @@ export function BookingDetailActions({ booking, consultants }: BookingDetailActi
   const [showRejectModal, setShowRejectModal] = useState(false);
   const [rejectReason, setRejectReason] = useState('المبلغ غير مطابق أو صورة الإشعار غير واضحة.');
 
-  // Reschedule state
-  const [showRescheduleModal, setShowRescheduleModal] = useState(false);
-  const [newSlotTime, setNewSlotTime] = useState('');
-
   // Assign consultant state
   const [showAssignModal, setShowAssignModal] = useState(false);
   const [assignedConsultantId, setAssignedConsultantId] = useState(booking.consultantId || consultants[0]?.id || '');
+
+  // Full Edit Modal State
+  const [showFullEditModal, setShowFullEditModal] = useState(false);
+  const [editStatus, setEditStatus] = useState(booking.status || 'pending_payment');
+  const [editSlotStart, setEditSlotStart] = useState(toDatetimeLocal(booking.slotStartTime));
+  const [editSlotEnd, setEditSlotEnd] = useState(toDatetimeLocal(booking.slotEndTime));
+  const [editMeetingLink, setEditMeetingLink] = useState(booking.meetingLink || '');
+  const [editConsultantId, setEditConsultantId] = useState(booking.consultantId || '');
+  const [editServiceId, setEditServiceId] = useState(booking.serviceId || (services[0]?.id || ''));
+  const [editCustomerName, setEditCustomerName] = useState(booking.customer?.fullName || '');
+  const [editCustomerEmail, setEditCustomerEmail] = useState(booking.customer?.email || '');
+  const [editCustomerPhone, setEditCustomerPhone] = useState(booking.customer?.whatsappPhone || '');
+  const [editCustomerCountry, setEditCustomerCountry] = useState(booking.customer?.country || '');
+  const [editCaseDescription, setEditCaseDescription] = useState(booking.caseDescription || '');
+  const [editCancellationReason, setEditCancellationReason] = useState(booking.cancellationReason || '');
 
   // Note state
   const [noteContent, setNoteContent] = useState('');
@@ -183,6 +231,77 @@ export function BookingDetailActions({ booking, consultants }: BookingDetailActi
     }
   };
 
+  // 6. Full Edit Save
+  const handleSaveFullEdit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setLoading(true);
+    setError(null);
+    setSuccess(null);
+
+    try {
+      const payload = {
+        status: editStatus,
+        slotStartTime: editSlotStart ? new Date(editSlotStart).toISOString() : undefined,
+        slotEndTime: editSlotEnd ? new Date(editSlotEnd).toISOString() : undefined,
+        meetingLink: editMeetingLink.trim() || null,
+        consultantId: editConsultantId || null,
+        serviceId: editServiceId || undefined,
+        customerName: editCustomerName.trim() || undefined,
+        customerEmail: editCustomerEmail.trim() || undefined,
+        customerPhone: editCustomerPhone.trim() || undefined,
+        customerCountry: editCustomerCountry.trim() || undefined,
+        caseDescription: editCaseDescription.trim() || null,
+        cancellationReason: editCancellationReason.trim() || null,
+      };
+
+      const res = await fetch(`/api/admin/bookings/${booking.id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      });
+
+      const data = await res.json();
+      if (!res.ok || !data.success) {
+        throw new Error(data.error || 'فشل تحديث بيانات الحجز');
+      }
+
+      setSuccess('تم تحديث كافة بيانات وتفاصيل الحجز بنجاح!');
+      setShowFullEditModal(false);
+      setTimeout(() => router.refresh(), 800);
+    } catch (err: any) {
+      setError(err.message || 'حدث خطأ أثناء تعديل الحجز');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // 7. Delete Booking
+  const handleDeleteBooking = async () => {
+    if (!confirm('تحذير شديد: هل أنت متأكد من رغبتك في حذف هذا الحجز نهائياً من قاعدة البيانات مع كافة الملاحظات وإيصالات الدفع؟ لا يمكن التراجع عن هذا الإجراء.')) {
+      return;
+    }
+
+    setLoading(true);
+    setError(null);
+
+    try {
+      const res = await fetch(`/api/admin/bookings/${booking.id}`, {
+        method: 'DELETE',
+      });
+      const data = await res.json();
+      if (!res.ok || !data.success) {
+        throw new Error(data.error || 'فشل حذف الحجز');
+      }
+
+      alert('تم حذف الحجز بنجاح.');
+      router.push('/admin/bookings');
+      router.refresh();
+    } catch (err: any) {
+      alert('خطأ أثناء الحذف: ' + err.message);
+      setLoading(false);
+    }
+  };
+
   return (
     <div className="space-y-6">
       {/* Alert Messages */}
@@ -201,7 +320,17 @@ export function BookingDetailActions({ booking, consultants }: BookingDetailActi
 
       {/* Main Action Bar */}
       <div className="bg-slate-900/80 backdrop-blur-xl border border-slate-800 rounded-3xl p-6 shadow-xl space-y-4">
-        <h3 className="text-sm font-bold text-white">إجراءات الحجز والتحقق</h3>
+        <div className="flex items-center justify-between">
+          <h3 className="text-sm font-bold text-white">إجراءات وإدارة الحجز</h3>
+          <button
+            type="button"
+            onClick={() => setShowFullEditModal(true)}
+            className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 font-bold text-xs transition-colors cursor-pointer"
+          >
+            <Edit className="w-3.5 h-3.5" />
+            <span>تعديل تفاصيل الحجز بالكامل</span>
+          </button>
+        </div>
 
         <div className="flex flex-wrap items-center gap-3">
           {/* If payment needs verification */}
@@ -250,6 +379,18 @@ export function BookingDetailActions({ booking, consultants }: BookingDetailActi
             <UserCheck className="w-3.5 h-3.5 text-emerald-400" />
             <span>تعيين / تغيير المستشار</span>
           </button>
+
+          {/* Delete Booking */}
+          <button
+            type="button"
+            disabled={loading}
+            onClick={handleDeleteBooking}
+            className="px-3.5 py-2.5 rounded-xl bg-red-500/10 hover:bg-red-500/20 text-red-400 border border-red-500/20 font-semibold text-xs flex items-center gap-1.5 transition-colors cursor-pointer mr-auto"
+            title="حذف هذا الحجز نهائياً"
+          >
+            <Trash2 className="w-3.5 h-3.5" />
+            <span>حذف الحجز</span>
+          </button>
         </div>
       </div>
 
@@ -286,7 +427,7 @@ export function BookingDetailActions({ booking, consultants }: BookingDetailActi
           <button
             type="submit"
             disabled={addingNote || !noteContent.trim()}
-            className="px-4 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-emerald-400 font-bold text-xs disabled:opacity-50"
+            className="px-4 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-emerald-400 font-bold text-xs disabled:opacity-50 cursor-pointer"
           >
             {addingNote ? 'جاري الحفظ...' : 'إضافة'}
           </button>
@@ -310,7 +451,6 @@ export function BookingDetailActions({ booking, consultants }: BookingDetailActi
             </div>
 
             <div className="space-y-4 text-xs">
-              {/* Custom Google Meet Link Input */}
               <div>
                 <label className="block text-slate-200 font-bold mb-1.5 flex items-center gap-1.5">
                   <Video className="w-4 h-4 text-emerald-400" />
@@ -328,7 +468,6 @@ export function BookingDetailActions({ booking, consultants }: BookingDetailActi
                 </p>
               </div>
 
-              {/* Admin Notes */}
               <div>
                 <label className="block text-slate-200 font-bold mb-1.5">
                   ملاحظات الإدارة والاعتماد (اختياري)
@@ -342,28 +481,25 @@ export function BookingDetailActions({ booking, consultants }: BookingDetailActi
                 />
               </div>
 
-              {/* Client & Booking Summary Info */}
               <div className="p-3.5 rounded-2xl bg-slate-950/80 border border-slate-800/80 space-y-1.5 text-[11px] text-slate-400">
                 <div className="flex justify-between">
                   <span>العميل:</span>
                   <span className="text-slate-200 font-semibold">{booking.customer?.fullName}</span>
                 </div>
                 <div className="flex justify-between">
-                  <span>البريد الإلكتروني:</span>
-                  <span className="text-slate-200 font-mono">{booking.customer?.email}</span>
-                </div>
-                <div className="flex justify-between">
-                  <span>المبلغ المطلوب:</span>
-                  <span className="text-emerald-400 font-bold">${booking.service?.price} USD</span>
+                  <span>المبلغ المستحق:</span>
+                  <span className="text-emerald-400 font-bold font-mono">
+                    {booking.payment?.amount} {booking.payment?.currency}
+                  </span>
                 </div>
               </div>
             </div>
 
-            <div className="flex items-center justify-end gap-2.5 pt-2 border-t border-slate-800/80">
+            <div className="flex justify-end gap-3 pt-3 border-t border-slate-800/80">
               <button
                 type="button"
                 onClick={() => setShowConfirmModal(false)}
-                className="px-4 py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 font-semibold text-xs transition-colors cursor-pointer"
+                className="px-5 py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 font-semibold text-xs transition-colors cursor-pointer"
               >
                 إلغاء
               </button>
@@ -371,23 +507,23 @@ export function BookingDetailActions({ booking, consultants }: BookingDetailActi
                 type="button"
                 disabled={loading}
                 onClick={handleConfirmPayment}
-                className="px-5 py-2.5 rounded-xl bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-400 hover:to-teal-400 text-slate-950 font-bold text-xs flex items-center gap-2 shadow-lg shadow-emerald-500/20 cursor-pointer disabled:opacity-50"
+                className="px-6 py-2.5 rounded-xl bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-400 hover:to-teal-400 text-slate-950 font-bold text-xs flex items-center gap-2 shadow-lg shadow-emerald-500/20 transition-all cursor-pointer disabled:opacity-50"
               >
                 {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : <CheckCircle2 className="w-4 h-4" />}
-                <span>تأكيد الحجز وإرسال الرابط للعميل</span>
+                <span>اعتماد الدفع وإرسال الإيميل</span>
               </button>
             </div>
           </div>
         </div>
       )}
 
-      {/* Reject Modal */}
+      {/* Reject Payment Modal */}
       {showRejectModal && (
         <div className="fixed inset-0 z-50 bg-black/70 backdrop-blur-sm flex items-center justify-center p-4">
           <div className="bg-slate-900 border border-slate-800 rounded-3xl p-6 max-w-md w-full space-y-4">
-            <h3 className="text-base font-bold text-white">رفض إشعار التحويل</h3>
-            <p className="text-xs text-slate-400 leading-relaxed">
-              يرجى كتابة سبب الرفض بوضوح ليتم إبلاغ العميل به وإعطائه فرصة جديدة لإعادة رفع الإشعار الصحيح.
+            <h3 className="text-base font-bold text-white">رفض إشعار الدفع</h3>
+            <p className="text-xs text-slate-400">
+              حدد سبب الرفض ليتم إرساله للعميل عبر البريد الإلكتروني وتمكينه من رفع إشعار جديد:
             </p>
             <textarea
               rows={3}
@@ -407,7 +543,7 @@ export function BookingDetailActions({ booking, consultants }: BookingDetailActi
                 type="button"
                 disabled={loading}
                 onClick={handleRejectPayment}
-                className="px-4 py-2 rounded-xl bg-red-600 hover:bg-red-500 text-white font-bold text-xs"
+                className="px-4 py-2 rounded-xl bg-red-600 hover:bg-red-500 text-white font-bold text-xs cursor-pointer"
               >
                 تأكيد الرفض
               </button>
@@ -447,11 +583,245 @@ export function BookingDetailActions({ booking, consultants }: BookingDetailActi
                 type="button"
                 disabled={loading}
                 onClick={handleAssignConsultant}
-                className="px-4 py-2 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-bold text-xs"
+                className="px-4 py-2 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-bold text-xs cursor-pointer"
               >
                 حفظ التعيين
               </button>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* Full Edit Booking Modal */}
+      {showFullEditModal && (
+        <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-md flex items-center justify-center p-4 overflow-y-auto">
+          <div className="bg-slate-900 border border-slate-800 rounded-3xl p-6 sm:p-7 max-w-2xl w-full space-y-5 shadow-2xl relative max-h-[90vh] flex flex-col">
+            {/* Header */}
+            <div className="flex items-center justify-between border-b border-slate-800/80 pb-4">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-2xl bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center text-emerald-400 shrink-0">
+                  <Edit className="w-5 h-5" />
+                </div>
+                <div>
+                  <h3 className="text-base font-extrabold text-white">تعديل كافة بيانات الحجز والموعد</h3>
+                  <p className="text-xs text-slate-400 mt-0.5">
+                    المرجع: <span className="font-mono text-emerald-400 font-bold">{booking.bookingReference}</span>
+                  </p>
+                </div>
+              </div>
+              <button
+                onClick={() => setShowFullEditModal(false)}
+                className="p-1.5 text-slate-400 hover:text-white rounded-xl hover:bg-slate-800"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            {/* Scrollable Form */}
+            <form onSubmit={handleSaveFullEdit} className="overflow-y-auto space-y-4 text-xs pr-1">
+              {/* Status */}
+              <div>
+                <label className="block text-slate-300 font-semibold mb-1.5">
+                  حالة الحجز (Status)
+                </label>
+                <select
+                  value={editStatus}
+                  onChange={(e) => setEditStatus(e.target.value)}
+                  className="w-full bg-slate-950 border border-slate-800 rounded-xl p-2.5 text-xs text-white focus:outline-none focus:border-emerald-500"
+                >
+                  {STATUS_OPTIONS.map((st) => (
+                    <option key={st.value} value={st.value}>
+                      {st.label}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              {/* Slot Start & End */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-slate-300 font-semibold mb-1.5 flex items-center gap-1.5">
+                    <Calendar className="w-3.5 h-3.5 text-emerald-400" />
+                    <span>تاريخ ووقت بدء الجلسة</span>
+                  </label>
+                  <input
+                    type="datetime-local"
+                    value={editSlotStart}
+                    onChange={(e) => setEditSlotStart(e.target.value)}
+                    className="w-full bg-slate-950 border border-slate-800 rounded-xl p-2.5 text-xs text-white focus:outline-none focus:border-emerald-500"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-slate-300 font-semibold mb-1.5 flex items-center gap-1.5">
+                    <Clock className="w-3.5 h-3.5 text-emerald-400" />
+                    <span>تاريخ ووقت انتهاء الجلسة</span>
+                  </label>
+                  <input
+                    type="datetime-local"
+                    value={editSlotEnd}
+                    onChange={(e) => setEditSlotEnd(e.target.value)}
+                    className="w-full bg-slate-950 border border-slate-800 rounded-xl p-2.5 text-xs text-white focus:outline-none focus:border-emerald-500"
+                  />
+                </div>
+              </div>
+
+              {/* Meeting Link */}
+              <div>
+                <label className="block text-slate-300 font-semibold mb-1.5 flex items-center gap-1.5">
+                  <Video className="w-3.5 h-3.5 text-emerald-400" />
+                  <span>رابط Google Meet المباشر</span>
+                </label>
+                <input
+                  type="url"
+                  value={editMeetingLink}
+                  onChange={(e) => setEditMeetingLink(e.target.value)}
+                  placeholder="https://meet.google.com/..."
+                  className="w-full bg-slate-950 border border-slate-800 rounded-xl p-2.5 text-xs text-white focus:outline-none focus:border-emerald-500 dir-ltr text-left font-mono"
+                />
+              </div>
+
+              {/* Consultant & Service */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-slate-300 font-semibold mb-1.5 flex items-center gap-1.5">
+                    <UserCheck className="w-3.5 h-3.5 text-emerald-400" />
+                    <span>المستشار المعيّن</span>
+                  </label>
+                  <select
+                    value={editConsultantId}
+                    onChange={(e) => setEditConsultantId(e.target.value)}
+                    className="w-full bg-slate-950 border border-slate-800 rounded-xl p-2.5 text-xs text-white focus:outline-none focus:border-emerald-500"
+                  >
+                    <option value="">بدون مستشار (غير معيّن)</option>
+                    {consultants.map((c) => (
+                      <option key={c.id} value={c.id}>
+                        {c.name}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-slate-300 font-semibold mb-1.5 flex items-center gap-1.5">
+                    <Briefcase className="w-3.5 h-3.5 text-emerald-400" />
+                    <span>نوع الخدمة</span>
+                  </label>
+                  <select
+                    value={editServiceId}
+                    onChange={(e) => setEditServiceId(e.target.value)}
+                    className="w-full bg-slate-950 border border-slate-800 rounded-xl p-2.5 text-xs text-white focus:outline-none focus:border-emerald-500"
+                  >
+                    {services.map((s) => (
+                      <option key={s.id} value={s.id}>
+                        {s.nameAr} (${s.price})
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+
+              {/* Customer Profile Section */}
+              <div className="p-3.5 rounded-2xl bg-slate-950/60 border border-slate-800/80 space-y-3">
+                <span className="font-bold text-white flex items-center gap-1.5">
+                  <User className="w-3.5 h-3.5 text-emerald-400" />
+                  <span>تعديل بيانات العميل المقترنة</span>
+                </span>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <div>
+                    <label className="block text-slate-400 text-[11px] mb-1">اسم العميل</label>
+                    <input
+                      type="text"
+                      value={editCustomerName}
+                      onChange={(e) => setEditCustomerName(e.target.value)}
+                      className="w-full bg-slate-900 border border-slate-800 rounded-xl p-2 text-xs text-white focus:outline-none focus:border-emerald-500"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-slate-400 text-[11px] mb-1">البريد الإلكتروني</label>
+                    <input
+                      type="email"
+                      value={editCustomerEmail}
+                      onChange={(e) => setEditCustomerEmail(e.target.value)}
+                      className="w-full bg-slate-900 border border-slate-800 rounded-xl p-2 text-xs text-white focus:outline-none focus:border-emerald-500 font-mono text-left dir-ltr"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-slate-400 text-[11px] mb-1">رقم الهاتف / WhatsApp</label>
+                    <input
+                      type="text"
+                      value={editCustomerPhone}
+                      onChange={(e) => setEditCustomerPhone(e.target.value)}
+                      className="w-full bg-slate-900 border border-slate-800 rounded-xl p-2 text-xs text-white focus:outline-none focus:border-emerald-500 font-mono text-left dir-ltr"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-slate-400 text-[11px] mb-1">الدولة أو الإقامة</label>
+                    <input
+                      type="text"
+                      value={editCustomerCountry}
+                      onChange={(e) => setEditCustomerCountry(e.target.value)}
+                      className="w-full bg-slate-900 border border-slate-800 rounded-xl p-2 text-xs text-white focus:outline-none focus:border-emerald-500"
+                    />
+                  </div>
+                </div>
+              </div>
+
+              {/* Case Description */}
+              <div>
+                <label className="block text-slate-300 font-semibold mb-1.5 flex items-center gap-1.5">
+                  <FileText className="w-3.5 h-3.5 text-emerald-400" />
+                  <span>تفاصيل واستفسار العميل المكتوب</span>
+                </label>
+                <textarea
+                  rows={3}
+                  value={editCaseDescription}
+                  onChange={(e) => setEditCaseDescription(e.target.value)}
+                  placeholder="نص استفسار العميل..."
+                  className="w-full bg-slate-950 border border-slate-800 rounded-xl p-2.5 text-xs text-white focus:outline-none focus:border-emerald-500 leading-relaxed"
+                />
+              </div>
+
+              {/* Cancellation Reason if cancelled */}
+              {editStatus === 'cancelled' && (
+                <div>
+                  <label className="block text-red-300 font-semibold mb-1.5">
+                    سبب الإلغاء (يظهر للعميل)
+                  </label>
+                  <textarea
+                    rows={2}
+                    value={editCancellationReason}
+                    onChange={(e) => setEditCancellationReason(e.target.value)}
+                    placeholder="سبب إلغاء الحجز..."
+                    className="w-full bg-slate-950 border border-red-500/40 rounded-xl p-2.5 text-xs text-white focus:outline-none focus:border-red-400"
+                  />
+                </div>
+              )}
+
+              {/* Buttons */}
+              <div className="flex items-center justify-between pt-4 border-t border-slate-800">
+                <button
+                  type="button"
+                  onClick={() => setShowFullEditModal(false)}
+                  className="px-4 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 font-semibold text-xs transition-colors"
+                >
+                  إلغاء
+                </button>
+
+                <button
+                  type="submit"
+                  disabled={loading}
+                  className="flex items-center gap-2 px-5 py-2.5 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-bold text-xs shadow-lg shadow-emerald-500/20 transition-all disabled:opacity-50 cursor-pointer"
+                >
+                  {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
+                  <span>حفظ كافة التعديلات</span>
+                </button>
+              </div>
+            </form>
           </div>
         </div>
       )}

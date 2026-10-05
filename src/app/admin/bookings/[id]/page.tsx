@@ -29,7 +29,7 @@ export default async function AdminBookingDetailPage({
 }) {
   const { id } = await params;
 
-  const [booking, consultants] = await Promise.all([
+  const [booking, consultants, services] = await Promise.all([
     prisma.booking.findUnique({
       where: { id },
       include: {
@@ -61,6 +61,11 @@ export default async function AdminBookingDetailPage({
     prisma.consultant.findMany({
       where: { isActive: true },
       include: { user: { select: { name: true } } },
+    }),
+    prisma.service.findMany({
+      where: { isActive: true },
+      select: { id: true, nameAr: true, price: true },
+      orderBy: { orderIndex: 'asc' },
     }),
   ]);
 
@@ -256,6 +261,7 @@ export default async function AdminBookingDetailPage({
           <BookingDetailActions
             booking={booking}
             consultants={consultants.map((c) => ({ id: c.id, name: c.user.name }))}
+            services={services}
           />
 
           {/* Meeting Link Card */}

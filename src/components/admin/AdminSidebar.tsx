@@ -41,6 +41,7 @@ export function AdminSidebar({ userRole, userName, userEmail }: AdminSidebarProp
     { name: 'المستشارون', href: '/admin/consultants', icon: GraduationCap },
     { name: 'الخدمات والأسعار', href: '/admin/services', icon: Briefcase },
     { name: 'المجالات والتخصصات', href: '/admin/specialties', icon: Compass },
+    { name: 'طرق الدفع', href: '/admin/payment-methods', icon: CreditCard },
     { name: 'التقييمات والآراء', href: '/admin/reviews', icon: Star },
     { name: 'الأسئلة الشائعة', href: '/admin/faqs', icon: HelpCircle },
     { name: 'سجل العمليات (Audit)', href: '/admin/audit-logs', icon: Shield },
