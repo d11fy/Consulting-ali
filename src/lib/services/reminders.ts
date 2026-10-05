@@ -1,6 +1,7 @@
 import prisma from '@/lib/db/prisma';
-import { addHours, subHours, subMinutes, isAfter, isBefore } from 'date-fns';
-import { sendEmail } from '@/lib/integrations/email/service';
+import { addHours, addMinutes, subHours, subMinutes, isAfter, isBefore } from 'date-fns';
+import { sendEmail, sendConsultantReminderEmail } from '@/lib/integrations/email/service';
+import { notifyConsultantUpcomingSessionTelegram } from '@/lib/integrations/telegram/service';
 
 export async function processAppointmentReminders() {
   const now = new Date();
@@ -131,7 +132,84 @@ export async function processAppointmentReminders() {
     }
   }
 
-  // 3. Process Slot Expiration Cleanup:
+  // 3. Process 30-minute Consultant Reminders:
+  // Bookings that are confirmed/scheduled, happening between 15 minutes and 40 minutes from now,
+  // and reminderConsultantSent is false.
+  const target30mStart = addMinutes(now, 15);
+  const target30mEnd = addMinutes(now, 40);
+
+  const bookings30m = await prisma.booking.findMany({
+    where: {
+      status: { in: ['confirmed', 'scheduled'] },
+      reminderConsultantSent: false,
+      slotStartTime: {
+        gte: target30mStart,
+        lte: target30mEnd,
+      },
+    },
+    include: {
+      customer: true,
+      service: true,
+      consultant: { include: { user: true } },
+    },
+  });
+
+  let sentConsultant30mCount = 0;
+  for (const b of bookings30m) {
+    try {
+      const consultantName = b.consultant?.user?.name || 'أ. علي هشام';
+      const consultantEmail = b.consultant?.user?.email;
+      const consultantTgId = b.consultant?.telegramChatId || null;
+
+      const dateTimeStr = new Date(b.slotStartTime).toLocaleString('ar-EG', {
+        dateStyle: 'full',
+        timeStyle: 'short',
+      });
+
+      // 1. Telegram Notification to Consultant (Direct to their chat_id or platform bot)
+      try {
+        await notifyConsultantUpcomingSessionTelegram({
+          consultantName,
+          customerName: b.customer.fullName,
+          serviceName: b.service.nameAr,
+          meetingLink: b.meetingLink,
+          slotStartTime: b.slotStartTime.toISOString(),
+          minutesRemaining: 30,
+          telegramChatId: consultantTgId,
+        });
+      } catch (tgErr) {
+        console.error(`Failed to send telegram 30m reminder to consultant for booking ${b.id}:`, tgErr);
+      }
+
+      // 2. Email Notification to Consultant
+      if (consultantEmail) {
+        try {
+          await sendConsultantReminderEmail({
+            to: consultantEmail,
+            consultantName,
+            customerName: b.customer.fullName,
+            serviceName: b.service.nameAr,
+            dateTimeStr,
+            meetingLink: b.meetingLink,
+            bookingReference: b.bookingReference,
+          });
+        } catch (mailErr) {
+          console.error(`Failed to send email 30m reminder to consultant for booking ${b.id}:`, mailErr);
+        }
+      }
+
+      // Mark reminder as sent
+      await prisma.booking.update({
+        where: { id: b.id },
+        data: { reminderConsultantSent: true },
+      });
+      sentConsultant30mCount++;
+    } catch (err) {
+      console.error(`Failed to process consultant 30m reminder for booking ${b.id}:`, err);
+    }
+  }
+
+  // 4. Process Slot Expiration Cleanup:
   // Auto-cancel bookings waiting for payment where slotExpiresAt < now
   const expiredBookings = await prisma.booking.updateMany({
     where: {
@@ -147,6 +225,7 @@ export async function processAppointmentReminders() {
   return {
     sent24hCount,
     sent1hCount,
+    sentConsultant30mCount,
     expiredSlotsReleased: expiredBookings.count,
   };
 }

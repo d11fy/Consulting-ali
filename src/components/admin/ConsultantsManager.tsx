@@ -34,6 +34,7 @@ export interface ConsultantAdminData {
   languages: string[];
   yearsOfExperience: number;
   isActive: boolean;
+  telegramChatId?: string | null;
   user: {
     name: string;
     email: string;
@@ -69,6 +70,7 @@ export function ConsultantsManager({ initialConsultants }: ConsultantsManagerPro
   const [yearsOfExperience, setYearsOfExperience] = useState(2);
   const [languagesInput, setLanguagesInput] = useState('العربية، الإنجليزية');
   const [tagsInput, setTagsInput] = useState('');
+  const [telegramChatId, setTelegramChatId] = useState('');
   const [isActive, setIsActive] = useState(true);
 
   const [loading, setLoading] = useState(false);
@@ -120,6 +122,7 @@ export function ConsultantsManager({ initialConsultants }: ConsultantsManagerPro
     setYearsOfExperience(2);
     setLanguagesInput('العربية، الإنجليزية');
     setTagsInput('');
+    setTelegramChatId('');
     setIsActive(true);
     setErrorMsg(null);
     setIsModalOpen(true);
@@ -140,6 +143,7 @@ export function ConsultantsManager({ initialConsultants }: ConsultantsManagerPro
     setYearsOfExperience(c.yearsOfExperience);
     setLanguagesInput(c.languages.join('، '));
     setTagsInput(c.tags.join('، '));
+    setTelegramChatId(c.telegramChatId || '');
     setIsActive(c.isActive);
     setErrorMsg(null);
     setIsModalOpen(true);
@@ -167,6 +171,7 @@ export function ConsultantsManager({ initialConsultants }: ConsultantsManagerPro
       yearsOfExperience: Number(yearsOfExperience),
       languages,
       tags,
+      telegramChatId: telegramChatId || null,
       isActive,
     };
 
@@ -473,6 +478,19 @@ export function ConsultantsManager({ initialConsultants }: ConsultantsManagerPro
                     onChange={(e) => setSlug(e.target.value)}
                     placeholder="alaa-alzatma"
                     className="w-full bg-slate-950 border border-slate-800 rounded-xl py-2.5 px-3.5 text-xs text-white focus:border-emerald-500 dir-ltr text-left"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-xs font-semibold text-slate-300 mb-1.5">
+                    معرف تيليجرام لتنبيهات المواعيد (Telegram Chat ID)
+                  </label>
+                  <input
+                    type="text"
+                    value={telegramChatId}
+                    onChange={(e) => setTelegramChatId(e.target.value)}
+                    placeholder="123456789 (اختياري)"
+                    className="w-full bg-slate-950 border border-slate-800 rounded-xl py-2.5 px-3.5 text-xs text-white focus:border-emerald-500 dir-ltr text-left font-mono"
                   />
                 </div>
               </div>

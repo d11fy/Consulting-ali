@@ -13,6 +13,7 @@ export async function POST(
 
     const body = await request.json().catch(() => ({}));
     const adminNotes = body.adminNotes;
+    const customMeetingLink = body.customMeetingLink || body.meetingLink;
     const idempotencyKey = body.idempotencyKey || request.headers.get('x-idempotency-key') || undefined;
 
     const result = await confirmBookingPayment({
@@ -20,6 +21,7 @@ export async function POST(
       adminId: session.id,
       adminName: session.name,
       adminNotes,
+      customMeetingLink,
       idempotencyKey,
     });
 

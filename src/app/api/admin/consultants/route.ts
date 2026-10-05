@@ -59,26 +59,30 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ success: false, error: 'يرجى تعبئة كافة الحقول المطلوبة' }, { status: 400 });
     }
 
+    const cleanEmail = email.trim().toLowerCase();
+
     // Check email uniqueness
-    const existingUser = await prisma.user.findUnique({ where: { email } });
+    const existingUser = await prisma.user.findUnique({ where: { email: cleanEmail } });
     if (existingUser) {
       return NextResponse.json({ success: false, error: 'البريد الإلكتروني مستخدم بالفعل' }, { status: 400 });
     }
 
     const salt = await bcrypt.genSalt(10);
-    const passwordHash = await bcrypt.hash(password || 'Consultant@123456', salt);
+    const rawPassword = password ? password.trim() : 'Consultant@123456';
+    const passwordHash = await bcrypt.hash(rawPassword, salt);
 
     // Generate slug if not provided
     const generatedSlug = slug || name.toLowerCase().trim().replace(/\s+/g, '-').replace(/[^\w-]/g, '');
 
     const user = await prisma.user.create({
       data: {
-        email,
-        name,
+        email: cleanEmail,
+        name: name.trim(),
         passwordHash,
-        phone: phone || null,
+        phone: phone ? phone.trim() : null,
         avatarUrl: avatarUrl || null,
         role: 'CONSULTANT',
+        isActive: isActive !== undefined ? Boolean(isActive) : true,
       },
     });
 
@@ -86,13 +90,14 @@ export async function POST(req: NextRequest) {
       data: {
         userId: user.id,
         slug: generatedSlug || undefined,
-        title,
-        initials: initials || null,
+        title: title.trim(),
+        initials: initials ? initials.trim() : null,
         shortBio: shortBio || null,
-        bio,
+        bio: bio.trim(),
         yearsOfExperience: Number(yearsOfExperience) || 1,
         languages: Array.isArray(languages) ? languages : ['العربية'],
         tags: Array.isArray(tags) ? tags : [],
+        telegramChatId: body.telegramChatId ? String(body.telegramChatId).trim() : null,
         isActive: isActive !== undefined ? Boolean(isActive) : true,
       },
       include: {

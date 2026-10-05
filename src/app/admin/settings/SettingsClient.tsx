@@ -288,6 +288,23 @@ export function SettingsClient({ initialSettings }: SettingsClientProps) {
               className="w-full bg-slate-950 border border-slate-800 rounded-xl p-3 text-slate-200 dir-ltr text-left"
             />
           </div>
+
+          <div className="sm:col-span-3 pt-2 border-t border-slate-800">
+            <label className="block text-slate-300 font-semibold mb-2 flex items-center gap-1.5">
+              <Mail className="w-4 h-4 text-blue-400" />
+              <span>البريد الإلكتروني المعتمد لتلقي إشعارات الإدارة (حجوزات جديدة، إشعارات دفع، تأكيدات)</span>
+            </label>
+            <input
+              type="text"
+              value={settings['admin_notification_email'] || ''}
+              onChange={(e) => handleChange('admin_notification_email', e.target.value)}
+              placeholder="admin@alihisham.com (يمكن وضع أكثر من بريد مفصولة بفاصلة)"
+              className="w-full bg-slate-950 border border-slate-800 rounded-xl p-3 text-slate-200 dir-ltr text-left"
+            />
+            <p className="text-[11px] text-slate-500 mt-1">
+              إذا تُرك فارغًا، سيتم إرسال إشعارات المنصة تلقائيًا إلى جميع حسابات المشرفين والمدراء المسجلين.
+            </p>
+          </div>
         </div>
       </div>
 

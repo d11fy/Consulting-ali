@@ -20,18 +20,20 @@ export async function getTelegramConfig() {
 
 export async function sendTelegramMessage(
   text: string,
-  buttons?: TelegramButton[]
+  buttons?: TelegramButton[],
+  customChatId?: string
 ): Promise<{ success: boolean; error?: string }> {
   try {
     const { token, chatId, isEnabled } = await getTelegramConfig();
+    const targetChatId = customChatId || chatId;
 
-    if (!isEnabled || !token || !chatId) {
+    if (!isEnabled || !token || !targetChatId) {
       console.log('Telegram notifications not configured or disabled.');
       return { success: false, error: 'Telegram credentials missing or disabled' };
     }
 
     const payload: any = {
-      chat_id: chatId,
+      chat_id: targetChatId,
       text,
       parse_mode: 'HTML',
     };
@@ -140,4 +142,35 @@ ${booking.meetingLink ? `<b>رابط الاجتماع:</b> ${booking.meetingLink
   `.trim();
 
   return sendTelegramMessage(text);
+}
+
+export async function notifyConsultantUpcomingSessionTelegram(data: {
+  consultantName: string;
+  customerName: string;
+  serviceName: string;
+  meetingLink?: string | null;
+  slotStartTime: string;
+  minutesRemaining: number;
+  telegramChatId?: string | null;
+}) {
+  const text = `
+⏰ <b>تنبيه موعد استشارة قادمة</b>
+
+مرحبًا <b>${data.consultantName}</b>،
+نود تذكيرك بأن لديك جلسة استشارية ستبدأ بعد <b>${data.minutesRemaining} دقيقة</b>!
+
+👤 <b>العميل:</b> ${data.customerName}
+📋 <b>الخدمة:</b> ${data.serviceName}
+🕒 <b>الموعد:</b> ${new Date(data.slotStartTime).toLocaleString('ar-EG')}
+${data.meetingLink ? `🔗 <b>رابط Google Meet:</b> ${data.meetingLink}` : ''}
+
+يرجى فتح غرفة الاجتماع والتأكد من الجاهزية.
+  `.trim();
+
+  const buttons: TelegramButton[] = [];
+  if (data.meetingLink) {
+    buttons.push({ text: 'الانضمام للاجتماع 🎥', url: data.meetingLink });
+  }
+
+  return sendTelegramMessage(text, buttons.length > 0 ? buttons : undefined, data.telegramChatId || undefined);
 }

@@ -41,6 +41,7 @@ export default async function AdminConsultantsPage() {
     languages: c.languages,
     yearsOfExperience: c.yearsOfExperience,
     isActive: c.isActive,
+    telegramChatId: c.telegramChatId,
     user: c.user,
     googleConnection: c.googleConnection,
     bookings: c.bookings,

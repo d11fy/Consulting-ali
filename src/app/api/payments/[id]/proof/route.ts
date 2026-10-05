@@ -5,6 +5,8 @@ import path from 'path';
 import os from 'os';
 import crypto from 'crypto';
 import { BookingStatus, PaymentStatus } from '@prisma/client';
+import { notifyPaymentProofTelegram } from '@/lib/integrations/telegram/service';
+import { sendAdminNotificationEmail } from '@/lib/integrations/email/service';
 
 const ALLOWED_RECEIPT_MIMES = [
   'image/jpeg',
@@ -141,75 +143,55 @@ export async function POST(
     const paymentDate = paymentDateStr ? new Date(paymentDateStr) : new Date();
     const amount = amountStr ? parseFloat(amountStr) : payment.amount;
 
-    // Transactional DB update
-    const updatedData = await prisma.$transaction(async (tx) => {
-      // 1. Create Payment Proof
-      const proof = await tx.paymentProof.create({
-        data: {
-          paymentId: payment.id,
-          senderName,
-          amount,
-          currency,
-          transactionNumber: transactionNumber ? transactionNumber.trim() : null,
-          paymentDate,
-          receiptFilePath: targetFilePath,
-          receiptFileName: receiptFile.name,
-          fileMime: mimeType,
-          fileSize: receiptFile.size,
-          notes: notes || null,
-          status: 'pending',
-        },
-      });
-
-      // 2. Update Payment
-      await tx.payment.update({
-        where: { id: payment.id },
-        data: {
-          status: PaymentStatus.uploaded,
-          ...(validPaymentMethodId && { paymentMethodId: validPaymentMethodId }),
-        },
-      });
-
-      // 3. Update Booking Status
-      await tx.booking.update({
-        where: { id: payment.bookingId },
-        data: {
-          status: BookingStatus.payment_uploaded,
-        },
-      });
-
-      // 4. Record Booking Status History
-      await tx.bookingStatusHistory.create({
-        data: {
-          bookingId: payment.bookingId,
-          fromStatus: payment.booking.status,
-          toStatus: BookingStatus.payment_uploaded,
-          changedBy: senderName,
-          note: `تم رفع إثبات الدفع بواسطة ${senderName} بقيمة ${amount} ${currency}`,
-        },
-      });
-
-      return proof;
+    // Sequential DB updates (avoiding interactive transaction timeout with remote Supabase pooler)
+    // 1. Create Payment Proof
+    const proof = await prisma.paymentProof.create({
+      data: {
+        paymentId: payment.id,
+        senderName,
+        amount,
+        currency,
+        transactionNumber: transactionNumber ? transactionNumber.trim() : null,
+        paymentDate,
+        receiptFilePath: targetFilePath,
+        receiptFileName: receiptFile.name,
+        fileMime: mimeType,
+        fileSize: receiptFile.size,
+        notes: notes || null,
+        status: 'pending',
+      },
     });
 
-    // Queue notifications to admins
-    try {
-      await prisma.jobQueue.create({
-        data: {
-          type: 'TELEGRAM_NOTIFY',
-          payload: JSON.stringify({
-            event: 'PAYMENT_PROOF_UPLOADED',
-            bookingId: payment.bookingId,
-            reference: payment.booking.bookingReference,
-            customerName: payment.booking.customer.fullName,
-            senderName,
-            amount,
-            currency,
-            transactionNumber,
-          }),
-        },
-      });
+    // 2. Update Payment
+    await prisma.payment.update({
+      where: { id: payment.id },
+      data: {
+        status: PaymentStatus.uploaded,
+        ...(validPaymentMethodId && { paymentMethodId: validPaymentMethodId }),
+      },
+    });
 
+    // 3. Update Booking Status
+    await prisma.booking.update({
+      where: { id: payment.bookingId },
+      data: {
+        status: BookingStatus.payment_uploaded,
+      },
+    });
+
+    // 4. Record Booking Status History
+    await prisma.bookingStatusHistory.create({
+      data: {
+        bookingId: payment.bookingId,
+        fromStatus: payment.booking.status,
+        toStatus: BookingStatus.payment_uploaded,
+        changedBy: senderName,
+        note: `تم رفع إثبات الدفع بواسطة ${senderName} بقيمة ${amount} ${currency}`,
+      },
+    });
+
+    // Direct Notifications to Admin (In-app, Telegram, Email)
+    try {
       await prisma.notification.create({
         data: {
           recipientType: 'admin',
@@ -219,14 +201,49 @@ export async function POST(
           linkUrl: `/admin/bookings/${payment.bookingId}`,
         },
       });
+
+      // Direct Telegram notification
+      try {
+        await notifyPaymentProofTelegram({
+          id: payment.bookingId,
+          reference: payment.booking.bookingReference,
+          customerName: payment.booking.customer.fullName,
+          senderName,
+          amount,
+          currency,
+          transactionNumber: transactionNumber || undefined,
+        });
+      } catch (tgErr) {
+        console.error('Failed to send telegram notification for payment proof:', tgErr);
+      }
+
+      // Direct Admin Email notification
+      try {
+        await sendAdminNotificationEmail({
+          subject: `💳 إشعار دفع جديد بانتظار المراجعة والاعتماد [${payment.booking.bookingReference}]`,
+          title: `تم رفع إشعار تحويل جديد بانتظار مراجعة الإدارة واعتماده`,
+          detailsHtml: `
+            <p><strong>الرقم المرجعي:</strong> <code>${payment.booking.bookingReference}</code></p>
+            <p><strong>العميل:</strong> ${payment.booking.customer.fullName} (${payment.booking.customer.email})</p>
+            <p><strong>اسم المحول:</strong> ${senderName}</p>
+            <p><strong>المبلغ المحول:</strong> ${amount} ${currency}</p>
+            ${transactionNumber ? `<p><strong>رقم الحوالة:</strong> <code>${transactionNumber}</code></p>` : ''}
+            ${notes ? `<p><strong>ملاحظات العميل:</strong> ${notes}</p>` : ''}
+          `,
+          actionUrl: `/admin/bookings/${payment.bookingId}`,
+          actionText: 'مراجعة إشعار الدفع واعتماده الآن',
+        });
+      } catch (mailErr) {
+        console.error('Failed to send admin email notification for payment proof:', mailErr);
+      }
     } catch (err) {
-      console.error('Failed to queue notifications on payment proof:', err);
+      console.error('Failed to process notifications on payment proof:', err);
     }
 
     return NextResponse.json({
       success: true,
       message: 'تم رفع إشعار الدفع بنجاح وهو قيد المراجعة والتحقق.',
-      proofId: updatedData.id,
+      proofId: proof.id,
     });
   } catch (error: any) {
     console.error('Error uploading payment proof:', error);

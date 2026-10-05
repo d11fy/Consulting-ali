@@ -1,6 +1,8 @@
 import prisma from '@/lib/db/prisma';
 import { addMinutes } from 'date-fns';
 import { BookingStatus, PaymentStatus } from '@prisma/client';
+import { notifyNewBookingTelegram } from '@/lib/integrations/telegram/service';
+import { sendAdminNotificationEmail } from '@/lib/integrations/email/service';
 
 export interface CreateBookingInput {
   serviceId: string;
@@ -189,26 +191,14 @@ export async function createNewBooking(input: CreateBookingInput) {
     }
 
     return newBooking;
+  }, {
+    timeout: 25000,
+    maxWait: 10000,
   });
 
-  // 5. Asynchronous notification via JobQueue (won't fail booking if worker fails)
+  // 5. Notifications to Admin (Telegram, Email, In-app)
   try {
-    await prisma.jobQueue.create({
-      data: {
-        type: 'TELEGRAM_NOTIFY',
-        payload: JSON.stringify({
-          event: 'NEW_BOOKING_PENDING',
-          bookingId: booking.id,
-          reference: booking.bookingReference,
-          customerName: input.fullName,
-          serviceName: service.nameAr,
-          amount: service.price,
-          slotStart: startTime.toISOString(),
-        }),
-      },
-    });
-
-    // Create in-app notification for admin
+    // In-app notification
     await prisma.notification.create({
       data: {
         recipientType: 'admin',
@@ -218,8 +208,52 @@ export async function createNewBooking(input: CreateBookingInput) {
         linkUrl: `/admin/bookings/${booking.id}`,
       },
     });
+
+    // Fetch assigned consultant details for notification text
+    const consultant = targetConsultantId
+      ? await prisma.consultant.findUnique({
+          where: { id: targetConsultantId },
+          include: { user: true },
+        })
+      : null;
+
+    // Telegram Bot notification to Admin
+    try {
+      await notifyNewBookingTelegram({
+        id: booking.id,
+        reference: booking.bookingReference,
+        customerName: input.fullName,
+        serviceName: service.nameAr,
+        amount: service.price,
+        consultantName: consultant?.user?.name || 'توجيه تلقائي',
+        slotStartTime: startTime.toISOString(),
+      });
+    } catch (tgErr) {
+      console.error('Failed to send telegram notification for new booking:', tgErr);
+    }
+
+    // Admin Notification Email
+    try {
+      await sendAdminNotificationEmail({
+        subject: `🔔 حجز استشارة جديد بانتظار الدفع [${booking.bookingReference}]`,
+        title: `تم تسجيل حجز استشارة جديد بانتظار التحويل والدفع`,
+        detailsHtml: `
+          <p><strong>الرقم المرجعي:</strong> <code>${booking.bookingReference}</code></p>
+          <p><strong>اسم العميل:</strong> ${input.fullName} (${input.email})</p>
+          <p><strong>رقم الهاتف / واتساب:</strong> ${input.whatsappPhone}</p>
+          <p><strong>نوع الاستشارة:</strong> ${service.nameAr}</p>
+          <p><strong>المستشار:</strong> ${consultant?.user?.name || 'توجيه تلقائي'}</p>
+          <p><strong>المبلغ المطلوب:</strong> $${service.price} USD</p>
+          <p><strong>الموعد المحجوز:</strong> ${startTime.toLocaleString('ar-EG')}</p>
+        `,
+        actionUrl: `/admin/bookings/${booking.id}`,
+        actionText: 'عرض تفاصيل الحجز',
+      });
+    } catch (mailErr) {
+      console.error('Failed to send admin email notification for new booking:', mailErr);
+    }
   } catch (err) {
-    console.error('Failed to queue notification for new booking:', err);
+    console.error('Failed to process notifications for new booking:', err);
   }
 
   return booking;

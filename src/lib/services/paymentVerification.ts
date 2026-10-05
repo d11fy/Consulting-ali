@@ -2,7 +2,7 @@ import prisma from '@/lib/db/prisma';
 import { BookingStatus, PaymentStatus } from '@prisma/client';
 import { createGoogleMeetingEvent } from '@/lib/integrations/google/calendar';
 import { notifyPaymentConfirmedTelegram } from '@/lib/integrations/telegram/service';
-import { sendBookingConfirmationEmail } from '@/lib/integrations/email/service';
+import { sendBookingConfirmationEmail, sendAdminNotificationEmail } from '@/lib/integrations/email/service';
 
 export interface ConfirmPaymentOptions {
   paymentId: string;
@@ -10,6 +10,7 @@ export interface ConfirmPaymentOptions {
   adminName: string;
   adminNotes?: string;
   idempotencyKey?: string;
+  customMeetingLink?: string;
 }
 
 export async function confirmBookingPayment({
@@ -18,6 +19,7 @@ export async function confirmBookingPayment({
   adminName,
   adminNotes,
   idempotencyKey,
+  customMeetingLink,
 }: ConfirmPaymentOptions) {
   // 1. Fetch Payment and Booking
   const payment = await prisma.payment.findUnique({
@@ -54,84 +56,89 @@ export async function confirmBookingPayment({
 
   const now = new Date();
 
-  // 2. Transactional DB Updates
-  const updatedBooking = await prisma.$transaction(async (tx) => {
-    // Update Payment
-    await tx.payment.update({
-      where: { id: payment.id },
-      data: {
-        status: PaymentStatus.confirmed,
-        confirmedAt: now,
-        confirmedBy: adminName,
-        idempotencyKey: idempotencyKey || payment.idempotencyKey || null,
-      },
-    });
-
-    // Update Latest Proof to accepted
-    if (payment.proofs.length > 0) {
-      await tx.paymentProof.update({
-        where: { id: payment.proofs[0].id },
-        data: {
-          status: 'accepted',
-          reviewedAt: now,
-          reviewedBy: adminName,
-          adminNotes: adminNotes || 'تم التحقق من الدفع واعتماده',
-        },
-      });
-    }
-
-    // Update Booking
-    const bk = await tx.booking.update({
-      where: { id: payment.bookingId },
-      data: {
-        status: BookingStatus.confirmed,
-      },
-      include: {
-        customer: true,
-        service: true,
-        consultant: { include: { user: true } },
-      },
-    });
-
-    // Record Status History
-    await tx.bookingStatusHistory.create({
-      data: {
-        bookingId: bk.id,
-        fromStatus: payment.booking.status,
-        toStatus: BookingStatus.confirmed,
-        changedBy: adminName,
-        note: `تم اعتماد الدفع وتأكيد الحجز رسميًا بواسطة المشرف ${adminName}`,
-      },
-    });
-
-    // Write Audit Log
-    await tx.auditLog.create({
-      data: {
-        actorId: adminId,
-        actorName: adminName,
-        action: 'CONFIRM_PAYMENT',
-        entity: 'Payment',
-        entityId: payment.id,
-        oldValue: JSON.stringify({ status: payment.status, bookingStatus: payment.booking.status }),
-        newValue: JSON.stringify({ status: 'confirmed', bookingStatus: 'confirmed' }),
-      },
-    });
-
-    return bk;
+  // 2. Sequential DB Updates
+  // Update Payment
+  await prisma.payment.update({
+    where: { id: payment.id },
+    data: {
+      status: PaymentStatus.confirmed,
+      confirmedAt: now,
+      confirmedBy: adminName,
+      idempotencyKey: idempotencyKey || payment.idempotencyKey || null,
+    },
   });
 
-  // 3. Google Calendar & Google Meet (Non-blocking resilience)
-  let meetLink = updatedBooking.meetingLink;
-  try {
-    const calResult = await createGoogleMeetingEvent(updatedBooking.id);
-    if (calResult.meetLink) {
-      meetLink = calResult.meetLink;
-    }
-  } catch (err) {
-    console.error('Google Calendar creation failed non-fatally:', err);
+  // Update Latest Proof to accepted
+  if (payment.proofs.length > 0) {
+    await prisma.paymentProof.update({
+      where: { id: payment.proofs[0].id },
+      data: {
+        status: 'accepted',
+        reviewedAt: now,
+        reviewedBy: adminName,
+        adminNotes: adminNotes || 'تم التحقق من الدفع واعتماده',
+      },
+    });
   }
 
-  // 4. Send Confirmation Email to Customer (Non-blocking resilience)
+  const cleanedCustomMeetingLink = customMeetingLink?.trim() || null;
+  let meetLink = cleanedCustomMeetingLink || payment.booking.meetingLink || null;
+
+  // Update Booking
+  const updatedBooking = await prisma.booking.update({
+    where: { id: payment.bookingId },
+    data: {
+      status: BookingStatus.confirmed,
+      ...(cleanedCustomMeetingLink && { meetingLink: cleanedCustomMeetingLink }),
+    },
+    include: {
+      customer: true,
+      service: true,
+      consultant: { include: { user: true } },
+    },
+  });
+
+  if (updatedBooking.meetingLink) {
+    meetLink = updatedBooking.meetingLink;
+  }
+
+  // Record Status History
+  await prisma.bookingStatusHistory.create({
+    data: {
+      bookingId: updatedBooking.id,
+      fromStatus: payment.booking.status,
+      toStatus: BookingStatus.confirmed,
+      changedBy: adminName,
+      note: adminNotes || `تم اعتماد الدفع وتأكيد الحجز رسميًا بواسطة المشرف ${adminName}`,
+    },
+  });
+
+  // Write Audit Log
+  await prisma.auditLog.create({
+    data: {
+      actorId: adminId,
+      actorName: adminName,
+      action: 'CONFIRM_PAYMENT',
+      entity: 'Payment',
+      entityId: payment.id,
+      oldValue: JSON.stringify({ status: payment.status, bookingStatus: payment.booking.status }),
+      newValue: JSON.stringify({ status: 'confirmed', bookingStatus: 'confirmed' }),
+    },
+  });
+
+  // 3. Google Calendar & Google Meet (Only if admin did not specify a custom meet link)
+  if (!cleanedCustomMeetingLink && !meetLink) {
+    try {
+      const calResult = await createGoogleMeetingEvent(updatedBooking.id);
+      if (calResult.meetLink) {
+        meetLink = calResult.meetLink;
+      }
+    } catch (err) {
+      console.error('Google Calendar creation failed non-fatally:', err);
+    }
+  }
+
+  // 4. Send Confirmation Email to Customer (Using exact custom link, without random fallback)
   try {
     const dateTimeStr = new Date(updatedBooking.slotStartTime).toLocaleString('ar-EG', {
       dateStyle: 'full',
@@ -146,7 +153,7 @@ export async function confirmBookingPayment({
       serviceName: updatedBooking.service.nameAr,
       consultantName: updatedBooking.consultant?.user.name || 'أ. علي هشام',
       dateTimeStr,
-      meetingLink: meetLink || `https://meet.google.com/lookup/masarat-${updatedBooking.bookingReference.toLowerCase()}`,
+      meetingLink: meetLink || null,
     });
   } catch (err) {
     console.error('Confirmation email failed non-fatally:', err);
@@ -164,6 +171,26 @@ export async function confirmBookingPayment({
     });
   } catch (err) {
     console.error('Telegram confirmation failed non-fatally:', err);
+  }
+
+  // 6. Admin Notification Email
+  try {
+    await sendAdminNotificationEmail({
+      subject: `✅ تم اعتماد الدفع وتأكيد الحجز [${updatedBooking.bookingReference}]`,
+      title: `تم تأكيد حجز واعتماد الدفع بواسطة المشرف: ${adminName}`,
+      detailsHtml: `
+        <p><strong>الرقم المرجعي:</strong> <code>${updatedBooking.bookingReference}</code></p>
+        <p><strong>اسم العميل:</strong> ${updatedBooking.customer.fullName} (${updatedBooking.customer.email})</p>
+        <p><strong>الخدمة:</strong> ${updatedBooking.service.nameAr}</p>
+        <p><strong>المستشار:</strong> ${updatedBooking.consultant?.user.name || 'أ. علي هشام'}</p>
+        <p><strong>الموعد:</strong> ${new Date(updatedBooking.slotStartTime).toLocaleString('ar-EG')}</p>
+        ${meetLink ? `<p><strong>رابط الاجتماع المعتمد:</strong> <a href="${meetLink}" style="color: #10b981; font-weight: bold;">${meetLink}</a></p>` : ''}
+      `,
+      actionUrl: `/admin/bookings/${updatedBooking.id}`,
+      actionText: 'عرض تفاصيل الحجز',
+    });
+  } catch (err) {
+    console.error('Admin confirmation email failed non-fatally:', err);
   }
 
   return {
@@ -197,56 +224,54 @@ export async function rejectBookingPayment({
 
   const now = new Date();
 
-  await prisma.$transaction(async (tx) => {
-    await tx.payment.update({
-      where: { id: payment.id },
+  await prisma.payment.update({
+    where: { id: payment.id },
+    data: {
+      status: PaymentStatus.rejected,
+      rejectionReason,
+    },
+  });
+
+  if (payment.proofs.length > 0) {
+    await prisma.paymentProof.update({
+      where: { id: payment.proofs[0].id },
       data: {
-        status: PaymentStatus.rejected,
-        rejectionReason,
+        status: 'rejected',
+        reviewedAt: now,
+        reviewedBy: adminName,
+        adminNotes: rejectionReason,
       },
     });
+  }
 
-    if (payment.proofs.length > 0) {
-      await tx.paymentProof.update({
-        where: { id: payment.proofs[0].id },
-        data: {
-          status: 'rejected',
-          reviewedAt: now,
-          reviewedBy: adminName,
-          adminNotes: rejectionReason,
-        },
-      });
-    }
+  // Revert booking to pending_payment with fresh 2-hour window for customer to re-upload
+  await prisma.booking.update({
+    where: { id: payment.bookingId },
+    data: {
+      status: BookingStatus.pending_payment,
+      slotExpiresAt: new Date(Date.now() + 120 * 60 * 1000),
+    },
+  });
 
-    // Revert booking to pending_payment with fresh 2-hour window for customer to re-upload
-    await tx.booking.update({
-      where: { id: payment.bookingId },
-      data: {
-        status: BookingStatus.pending_payment,
-        slotExpiresAt: new Date(Date.now() + 120 * 60 * 1000),
-      },
-    });
+  await prisma.bookingStatusHistory.create({
+    data: {
+      bookingId: payment.bookingId,
+      fromStatus: payment.booking.status,
+      toStatus: BookingStatus.pending_payment,
+      changedBy: adminName,
+      note: `تم رفض إشعار الدفع بسبب: ${rejectionReason}. تم إتاحة مهلة جديدة للعميل لإعادة الرفع.`,
+    },
+  });
 
-    await tx.bookingStatusHistory.create({
-      data: {
-        bookingId: payment.bookingId,
-        fromStatus: payment.booking.status,
-        toStatus: BookingStatus.pending_payment,
-        changedBy: adminName,
-        note: `تم رفض إشعار الدفع بسبب: ${rejectionReason}. تم إتاحة مهلة جديدة للعميل لإعادة الرفع.`,
-      },
-    });
-
-    await tx.auditLog.create({
-      data: {
-        actorId: adminId,
-        actorName: adminName,
-        action: 'REJECT_PAYMENT',
-        entity: 'Payment',
-        entityId: payment.id,
-        newValue: JSON.stringify({ rejectionReason }),
-      },
-    });
+  await prisma.auditLog.create({
+    data: {
+      actorId: adminId,
+      actorName: adminName,
+      action: 'REJECT_PAYMENT',
+      entity: 'Payment',
+      entityId: payment.id,
+      newValue: JSON.stringify({ rejectionReason }),
+    },
   });
 
   return { success: true };

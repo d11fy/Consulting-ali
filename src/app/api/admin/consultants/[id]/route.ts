@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import prisma from '@/lib/db/prisma';
 import { getCurrentSession } from '@/lib/auth/session';
+import bcrypt from 'bcryptjs';
 
 export async function PUT(
   req: NextRequest,
@@ -18,6 +19,7 @@ export async function PUT(
     const {
       name,
       email,
+      password,
       phone,
       avatarUrl,
       title,
@@ -28,6 +30,7 @@ export async function PUT(
       yearsOfExperience,
       languages,
       tags,
+      telegramChatId,
       isActive,
     } = body;
 
@@ -40,14 +43,31 @@ export async function PUT(
       return NextResponse.json({ success: false, error: 'المستشار غير موجود' }, { status: 404 });
     }
 
+    // Prepare password hash if updated
+    let newPasswordHash: string | undefined = undefined;
+    if (password && typeof password === 'string' && password.trim().length > 0) {
+      const salt = await bcrypt.genSalt(10);
+      newPasswordHash = await bcrypt.hash(password.trim(), salt);
+    }
+
+    const cleanEmail = email ? email.trim().toLowerCase() : undefined;
+    if (cleanEmail && cleanEmail !== existingConsultant.user.email) {
+      const emailConflict = await prisma.user.findUnique({ where: { email: cleanEmail } });
+      if (emailConflict) {
+        return NextResponse.json({ success: false, error: 'البريد الإلكتروني مستخدم لحساب آخر' }, { status: 400 });
+      }
+    }
+
     // Update user info
     await prisma.user.update({
       where: { id: existingConsultant.userId },
       data: {
-        ...(name && { name }),
-        ...(email && { email }),
-        ...(phone !== undefined && { phone }),
+        ...(name && { name: name.trim() }),
+        ...(cleanEmail && { email: cleanEmail }),
+        ...(newPasswordHash && { passwordHash: newPasswordHash }),
+        ...(phone !== undefined && { phone: phone ? phone.trim() : null }),
         ...(avatarUrl !== undefined && { avatarUrl }),
+        ...(isActive !== undefined && { isActive: Boolean(isActive) }),
       },
     });
 
@@ -55,7 +75,7 @@ export async function PUT(
     const updatedConsultant = await prisma.consultant.update({
       where: { id },
       data: {
-        ...(title && { title }),
+        ...(title && { title: title.trim() }),
         ...(slug !== undefined && { slug }),
         ...(initials !== undefined && { initials }),
         ...(shortBio !== undefined && { shortBio }),
@@ -63,6 +83,7 @@ export async function PUT(
         ...(yearsOfExperience !== undefined && { yearsOfExperience: Number(yearsOfExperience) }),
         ...(languages && { languages: Array.isArray(languages) ? languages : [languages] }),
         ...(tags && { tags: Array.isArray(tags) ? tags : [tags] }),
+        ...(telegramChatId !== undefined && { telegramChatId: telegramChatId ? String(telegramChatId).trim() : null }),
         ...(isActive !== undefined && { isActive: Boolean(isActive) }),
       },
       include: {

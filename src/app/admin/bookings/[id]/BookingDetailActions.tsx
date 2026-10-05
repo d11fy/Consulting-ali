@@ -13,6 +13,7 @@ import {
   AlertCircle,
   ExternalLink,
   MessageSquare,
+  Video,
 } from 'lucide-react';
 
 interface BookingDetailActionsProps {
@@ -26,6 +27,11 @@ export function BookingDetailActions({ booking, consultants }: BookingDetailActi
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
+
+  // Confirm modal state with custom Google Meet link
+  const [showConfirmModal, setShowConfirmModal] = useState(false);
+  const [customMeetingLink, setCustomMeetingLink] = useState(booking.meetingLink || '');
+  const [confirmNotes, setConfirmNotes] = useState('تم التحقق من التحويل وتأكيد الموعد');
 
   // Reject modal state
   const [showRejectModal, setShowRejectModal] = useState(false);
@@ -55,13 +61,15 @@ export function BookingDetailActions({ booking, consultants }: BookingDetailActi
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          adminNotes: 'تم الاعتماد والتأكيد بواسطة الإدارة',
+          customMeetingLink: customMeetingLink.trim() || undefined,
+          adminNotes: confirmNotes.trim() || 'تم الاعتماد والتأكيد بواسطة الإدارة',
           idempotencyKey: `confirm-${booking.id}-${Date.now()}`,
         }),
       });
 
       const data = await res.json();
       if (res.ok && data.success) {
+        setShowConfirmModal(false);
         setSuccess(data.message || 'تم اعتماد الدفع وتأكيد الحجز بنجاح.');
         setTimeout(() => router.refresh(), 1000);
       } else {
@@ -202,10 +210,10 @@ export function BookingDetailActions({ booking, consultants }: BookingDetailActi
               <button
                 type="button"
                 disabled={loading}
-                onClick={handleConfirmPayment}
+                onClick={() => setShowConfirmModal(true)}
                 className="px-5 py-2.5 rounded-xl bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-400 hover:to-teal-400 text-slate-950 font-bold text-xs flex items-center gap-2 shadow-lg shadow-emerald-500/20 cursor-pointer disabled:opacity-50"
               >
-                {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : <CheckCircle2 className="w-4 h-4" />}
+                <CheckCircle2 className="w-4 h-4" />
                 <span>اعتماد الدفع وتأكيد الحجز</span>
               </button>
 
@@ -284,6 +292,94 @@ export function BookingDetailActions({ booking, consultants }: BookingDetailActi
           </button>
         </form>
       </div>
+
+      {/* Confirm Payment & Add Meeting Link Modal */}
+      {showConfirmModal && (
+        <div className="fixed inset-0 z-50 bg-black/75 backdrop-blur-md flex items-center justify-center p-4 overflow-y-auto">
+          <div className="bg-slate-900 border border-slate-800 rounded-3xl p-6 sm:p-7 max-w-lg w-full space-y-5 shadow-2xl relative">
+            <div className="flex items-center gap-3 border-b border-slate-800/80 pb-4">
+              <div className="w-10 h-10 rounded-2xl bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center text-emerald-400 shrink-0">
+                <CheckCircle2 className="w-5 h-5" />
+              </div>
+              <div>
+                <h3 className="text-base font-extrabold text-white">اعتماد الدفع وتأكيد الحجز</h3>
+                <p className="text-xs text-slate-400 mt-0.5">
+                  أدخل رابط الاجتماع الحقيقي ليتم إرساله للعميل عبر البريد الإلكتروني.
+                </p>
+              </div>
+            </div>
+
+            <div className="space-y-4 text-xs">
+              {/* Custom Google Meet Link Input */}
+              <div>
+                <label className="block text-slate-200 font-bold mb-1.5 flex items-center gap-1.5">
+                  <Video className="w-4 h-4 text-emerald-400" />
+                  <span>رابط Google Meet المعتمد للجلسة</span>
+                </label>
+                <input
+                  type="url"
+                  value={customMeetingLink}
+                  onChange={(e) => setCustomMeetingLink(e.target.value)}
+                  placeholder="https://meet.google.com/abc-defg-hij"
+                  className="w-full bg-slate-950 border border-slate-800 rounded-xl p-3 text-xs text-white focus:outline-none focus:border-emerald-500 dir-ltr text-left font-mono"
+                />
+                <p className="text-[11px] text-slate-400 mt-1.5 leading-relaxed">
+                  💡 ضع هنا رابط Google Meet الفعلي الذي ستلتقي فيه مع العميل، وسيصل للعميل مباشرة في رسالة تأكيد الحجز على بريده الإلكتروني.
+                </p>
+              </div>
+
+              {/* Admin Notes */}
+              <div>
+                <label className="block text-slate-200 font-bold mb-1.5">
+                  ملاحظات الإدارة والاعتماد (اختياري)
+                </label>
+                <input
+                  type="text"
+                  value={confirmNotes}
+                  onChange={(e) => setConfirmNotes(e.target.value)}
+                  placeholder="تم التحقق من التحويل وتأكيد الموعد"
+                  className="w-full bg-slate-950 border border-slate-800 rounded-xl p-3 text-xs text-slate-200 focus:outline-none focus:border-emerald-500"
+                />
+              </div>
+
+              {/* Client & Booking Summary Info */}
+              <div className="p-3.5 rounded-2xl bg-slate-950/80 border border-slate-800/80 space-y-1.5 text-[11px] text-slate-400">
+                <div className="flex justify-between">
+                  <span>العميل:</span>
+                  <span className="text-slate-200 font-semibold">{booking.customer?.fullName}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span>البريد الإلكتروني:</span>
+                  <span className="text-slate-200 font-mono">{booking.customer?.email}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span>المبلغ المطلوب:</span>
+                  <span className="text-emerald-400 font-bold">${booking.service?.price} USD</span>
+                </div>
+              </div>
+            </div>
+
+            <div className="flex items-center justify-end gap-2.5 pt-2 border-t border-slate-800/80">
+              <button
+                type="button"
+                onClick={() => setShowConfirmModal(false)}
+                className="px-4 py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 font-semibold text-xs transition-colors cursor-pointer"
+              >
+                إلغاء
+              </button>
+              <button
+                type="button"
+                disabled={loading}
+                onClick={handleConfirmPayment}
+                className="px-5 py-2.5 rounded-xl bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-400 hover:to-teal-400 text-slate-950 font-bold text-xs flex items-center gap-2 shadow-lg shadow-emerald-500/20 cursor-pointer disabled:opacity-50"
+              >
+                {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : <CheckCircle2 className="w-4 h-4" />}
+                <span>تأكيد الحجز وإرسال الرابط للعميل</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Reject Modal */}
       {showRejectModal && (
