@@ -100,10 +100,10 @@ export default async function HomePage() {
     'مرحبًا، أريد الاستفسار عن الاستشارة المناسبة لحالتي.';
   const instagramAliHisham =
     settingsMap.get('instagram_ali_hisham') ||
-    'https://www.instagram.com/ali_hisham.eu?stkn=MTQzd3MzMW44MjF4dw%3D%3D&utm_source=qr';
+    'https://www.instagram.com/ali_hisham.eu';
   const instagramMasarat =
     settingsMap.get('instagram_masarat_study') ||
-    'https://www.instagram.com/masarat.study?stkn=MTN4OHc5a3pyYnMyMw==';
+    'https://www.instagram.com/masarat.study';
   const legalDisclaimer =
     settingsMap.get('legal_disclaimer') ||
     'الاستشارة خدمة توجيهية مبنية على المعلومات والوثائق التي يقدمها العميل، ولا تمثل ضمانًا للحصول على قبول أو تأشيرة أو منحة أو لمّ شمل أو موافقة من أي جهة. وفي الحالات التي تحتاج لاستشارة قانونية رسمية يتم توجيه العميل لمحامٍ أو مستشار مرخص حسب الدولة والاختصاص.';

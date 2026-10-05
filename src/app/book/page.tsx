@@ -58,8 +58,8 @@ export default async function BookPage() {
   const settingsMap = new Map(settings.map((s) => [s.key, s.value]));
 
   const whatsappNumber = settingsMap.get('whatsapp_number') || '+972567841404';
-  const instagramAliHisham = settingsMap.get('instagram_ali_hisham') || 'https://www.instagram.com/ali_hisham.eu?stkn=MTQzd3MzMW44MjF4dw%3D%3D&utm_source=qr';
-  const instagramMasarat = settingsMap.get('instagram_masarat_study') || 'https://www.instagram.com/masarat.study?stkn=MTN4OHc5a3pyYnMyMw==';
+  const instagramAliHisham = settingsMap.get('instagram_ali_hisham') || 'https://www.instagram.com/ali_hisham.eu';
+  const instagramMasarat = settingsMap.get('instagram_masarat_study') || 'https://www.instagram.com/masarat.study';
   const legalDisclaimer = settingsMap.get('legal_disclaimer') || '';
 
   return (

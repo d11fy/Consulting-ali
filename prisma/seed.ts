@@ -485,8 +485,8 @@ async function main() {
     { key: 'hero_subtitle', value: 'احجز استشارة مع المستشار المناسب لحالتك، وافهم خياراتك والخطوات التي تحتاجها بشكل واضح ومدروس.', category: 'general' },
     { key: 'whatsapp_number', value: '+972567841404', category: 'whatsapp' },
     { key: 'whatsapp_default_message', value: 'مرحبًا، أريد الاستفسار عن الاستشارة المناسبة لحالتي.', category: 'whatsapp' },
-    { key: 'instagram_ali_hisham', value: 'https://www.instagram.com/ali_hisham.eu?stkn=MTQzd3MzMW44MjF4dw%3D%3D&utm_source=qr', category: 'instagram' },
-    { key: 'instagram_masarat_study', value: 'https://www.instagram.com/masarat.study?stkn=MTN4OHc5a3pyYnMyMw==', category: 'instagram' },
+    { key: 'instagram_ali_hisham', value: 'https://www.instagram.com/ali_hisham.eu', category: 'instagram' },
+    { key: 'instagram_masarat_study', value: 'https://www.instagram.com/masarat.study', category: 'instagram' },
     { key: 'legal_disclaimer', value: 'الاستشارة خدمة توجيهية مبنية على المعلومات والوثائق التي يقدمها العميل، ولا تمثل ضمانًا للحصول على قبول أو تأشيرة أو منحة أو لمّ شمل أو موافقة من أي جهة. وفي الحالات التي تحتاج لاستشارة قانونية رسمية يتم توجيه العميل لمحامٍ أو مستشار مرخص حسب الدولة والاختصاص.', category: 'general' },
     { key: 'booking_expiration_minutes', value: '120', category: 'booking' }, // 2 hours to upload payment proof before slot is released
   ];

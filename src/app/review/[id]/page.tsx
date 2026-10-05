@@ -45,8 +45,8 @@ export default async function ReviewPage({
 
       <Footer
         legalDisclaimer="الاستشارة خدمة توجيهية واستشارية مبنية على البيانات والوثائق المقدمة."
-        instagramAliHisham="https://www.instagram.com/ali_hisham.eu?stkn=MTQzd3MzMW44MjF4dw%3D%3D&utm_source=qr"
-        instagramMasarat="https://www.instagram.com/masarat.study?stkn=MTN4OHc5a3pyYnMyMw=="
+        instagramAliHisham="https://www.instagram.com/ali_hisham.eu"
+        instagramMasarat="https://www.instagram.com/masarat.study"
         whatsappNumber="+972567841404"
       />
     </div>
