@@ -126,18 +126,16 @@ export function Footer({
 
           {/* Portals & Legal Access */}
           <div className="space-y-3">
-            <h4 className="text-sm font-bold text-white">إدارة المنصة</h4>
+            <h4 className="text-sm font-bold text-white">معايير الأمان</h4>
             <ul className="space-y-2 text-xs">
-              <li>
-                <Link href="/login" className="hover:text-emerald-400 transition-colors">
-                  دخول المستشارين والإدارة
-                </Link>
-              </li>
               <li>
                 <span className="text-slate-500">حماية البيانات مشفرة بالكامل</span>
               </li>
               <li>
                 <span className="text-slate-500">جلسات مباشرة عبر Google Meet</span>
+              </li>
+              <li>
+                <span className="text-slate-500">تواصل مباشر وإشعارات فورية</span>
               </li>
             </ul>
           </div>
@@ -164,10 +162,6 @@ export function Footer({
             جميع الحقوق محفوظة © {new Date().getFullYear()} — منصة أ. علي هشام للاستشارات الدولية.
           </div>
           <div className="flex items-center gap-4">
-            <Link href="/login" className="hover:text-slate-300 transition-colors">
-              بوابة الطاقم
-            </Link>
-            <span>•</span>
             <a href="#" className="hover:text-slate-300 transition-colors">
               سياسة الخصوصية
             </a>

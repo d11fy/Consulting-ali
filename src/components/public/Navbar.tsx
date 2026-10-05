@@ -43,20 +43,13 @@ export function Navbar({ userRole }: NavbarProps) {
 
         {/* Action Buttons */}
         <div className="hidden sm:flex items-center gap-3">
-          {userRole ? (
+          {userRole && (
             <Link
               href={userRole === 'SUPER_ADMIN' || userRole === 'ADMIN' ? '/admin' : '/consultant'}
               className="px-4 py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-semibold border border-slate-700 transition-all flex items-center gap-1.5"
             >
               <LogIn className="w-3.5 h-3.5 text-emerald-400" />
               <span>لوحة التحكم</span>
-            </Link>
-          ) : (
-            <Link
-              href="/login"
-              className="px-3.5 py-2 rounded-xl text-slate-400 hover:text-slate-200 text-xs font-medium transition-colors"
-            >
-              تسجيل الدخول
             </Link>
           )}
 
@@ -132,20 +125,13 @@ export function Navbar({ userRole }: NavbarProps) {
           >
             الأسئلة الشائعة
           </a>
-          <div className="pt-4 border-t border-slate-800 flex items-center justify-between">
-            <Link
-              href="/login"
-              onClick={() => setMobileMenuOpen(false)}
-              className="text-xs text-slate-400 hover:text-white"
-            >
-              تسجيل دخول المشرفين والمستشارين
-            </Link>
+          <div className="pt-4 border-t border-slate-800 flex items-center justify-end">
             <Link
               href="/book"
               onClick={() => setMobileMenuOpen(false)}
-              className="px-4 py-2 rounded-xl bg-emerald-500 text-slate-950 font-bold text-xs"
+              className="w-full py-3 text-center rounded-xl bg-gradient-to-r from-emerald-500 to-teal-500 text-slate-950 font-bold text-xs shadow-md"
             >
-              احجز موعد
+              احجز موعد استشارتك الآن
             </Link>
           </div>
         </div>
