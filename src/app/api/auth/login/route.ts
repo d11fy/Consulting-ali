@@ -1,11 +1,14 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { loginUser } from '@/lib/auth/service';
+import { SESSION_COOKIE_NAME } from '@/lib/auth/session';
 import { z } from 'zod';
 
 const loginSchema = z.object({
   email: z.string().email('صيغة البريد الإلكتروني غير صحيحة'),
   password: z.string().min(1, 'يرجى إدخال كلمة المرور'),
 });
+
+const SESSION_EXPIRATION_SECONDS = 60 * 60 * 24 * 7;
 
 export async function POST(request: NextRequest) {
   try {
@@ -31,15 +34,27 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ success: false, error: result.error }, { status: 401 });
     }
 
-    return NextResponse.json({
+    const response = NextResponse.json({
       success: true,
       user: result.user,
       redirectTo: result.redirectTo,
     });
-  } catch (error) {
+
+    if (result.token) {
+      response.cookies.set(SESSION_COOKIE_NAME, result.token, {
+        httpOnly: true,
+        secure: process.env.NODE_ENV === 'production',
+        sameSite: 'lax',
+        path: '/',
+        maxAge: SESSION_EXPIRATION_SECONDS,
+      });
+    }
+
+    return response;
+  } catch (error: any) {
     console.error('Login error:', error);
     return NextResponse.json(
-      { success: false, error: 'حدث خطأ غير متوقع أثناء تسجيل الدخول.' },
+      { success: false, error: error?.message || 'حدث خطأ غير متوقع أثناء تسجيل الدخول.' },
       { status: 500 }
     );
   }

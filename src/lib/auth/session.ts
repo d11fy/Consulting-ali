@@ -57,14 +57,18 @@ export async function verifySessionToken(token: string): Promise<SessionPayload 
 
 export async function setSessionCookie(user: SessionUser): Promise<string> {
   const token = await createSessionToken(user);
-  const cookieStore = await cookies();
-  cookieStore.set(SESSION_COOKIE_NAME, token, {
-    httpOnly: true,
-    secure: process.env.NODE_ENV === 'production',
-    sameSite: 'lax',
-    path: '/',
-    maxAge: SESSION_EXPIRATION_SECONDS,
-  });
+  try {
+    const cookieStore = await cookies();
+    cookieStore.set(SESSION_COOKIE_NAME, token, {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === 'production',
+      sameSite: 'lax',
+      path: '/',
+      maxAge: SESSION_EXPIRATION_SECONDS,
+    });
+  } catch (error) {
+    console.warn('setSessionCookie: next/headers cookies() store unavailable:', error);
+  }
   return token;
 }
 
