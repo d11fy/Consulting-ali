@@ -57,9 +57,9 @@ export default async function BookPage() {
   const settings = await prisma.siteSetting.findMany();
   const settingsMap = new Map(settings.map((s) => [s.key, s.value]));
 
-  const whatsappNumber = settingsMap.get('whatsapp_number') || '+970599123456';
-  const instagramAliHisham = settingsMap.get('instagram_ali_hisham') || 'https://instagram.com/ali_hisham';
-  const instagramMasarat = settingsMap.get('instagram_masarat_study') || 'https://instagram.com/masarat_study';
+  const whatsappNumber = settingsMap.get('whatsapp_number') || '+972567841404';
+  const instagramAliHisham = settingsMap.get('instagram_ali_hisham') || 'https://www.instagram.com/ali_hisham.eu?stkn=MTQzd3MzMW44MjF4dw%3D%3D&utm_source=qr';
+  const instagramMasarat = settingsMap.get('instagram_masarat_study') || 'https://www.instagram.com/masarat.study?stkn=MTN4OHc5a3pyYnMyMw==';
   const legalDisclaimer = settingsMap.get('legal_disclaimer') || '';
 
   return (

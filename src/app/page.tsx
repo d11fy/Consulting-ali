@@ -94,15 +94,16 @@ export default async function HomePage() {
   const settings = await prisma.siteSetting.findMany();
   const settingsMap = new Map(settings.map((s) => [s.key, s.value]));
 
-  const whatsappNumber = settingsMap.get('whatsapp_number') || '+970599123456';
+  const whatsappNumber = settingsMap.get('whatsapp_number') || '+972567841404';
   const whatsappMessage =
     settingsMap.get('whatsapp_default_message') ||
     'مرحبًا، أريد الاستفسار عن الاستشارة المناسبة لحالتي.';
   const instagramAliHisham =
-    settingsMap.get('instagram_ali_hisham') || 'https://instagram.com/ali_hisham';
+    settingsMap.get('instagram_ali_hisham') ||
+    'https://www.instagram.com/ali_hisham.eu?stkn=MTQzd3MzMW44MjF4dw%3D%3D&utm_source=qr';
   const instagramMasarat =
     settingsMap.get('instagram_masarat_study') ||
-    'https://instagram.com/masarat_study';
+    'https://www.instagram.com/masarat.study?stkn=MTN4OHc5a3pyYnMyMw==';
   const legalDisclaimer =
     settingsMap.get('legal_disclaimer') ||
     'الاستشارة خدمة توجيهية مبنية على المعلومات والوثائق التي يقدمها العميل، ولا تمثل ضمانًا للحصول على قبول أو تأشيرة أو منحة أو لمّ شمل أو موافقة من أي جهة. وفي الحالات التي تحتاج لاستشارة قانونية رسمية يتم توجيه العميل لمحامٍ أو مستشار مرخص حسب الدولة والاختصاص.';

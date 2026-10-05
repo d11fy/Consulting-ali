@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useRef } from 'react';
 import Link from 'next/link';
 import {
   UserPlus,
@@ -18,6 +18,8 @@ import {
   Mail,
   Phone,
   User,
+  Upload,
+  Image as ImageIcon,
 } from 'lucide-react';
 
 export interface ConsultantAdminData {
@@ -71,6 +73,37 @@ export function ConsultantsManager({ initialConsultants }: ConsultantsManagerPro
 
   const [loading, setLoading] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
+  const [uploadingImage, setUploadingImage] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    setUploadingImage(true);
+    setErrorMsg(null);
+
+    const formData = new FormData();
+    formData.append('file', file);
+
+    try {
+      const res = await fetch('/api/admin/consultants/upload', {
+        method: 'POST',
+        body: formData,
+      });
+
+      const data = await res.json();
+      if (res.ok && data.success) {
+        setAvatarUrl(data.url);
+      } else {
+        setErrorMsg(data.error || 'فشل رفع الصورة');
+      }
+    } catch {
+      setErrorMsg('حدث خطأ أثناء رفع الصورة');
+    } finally {
+      setUploadingImage(false);
+    }
+  };
 
   const openAddModal = () => {
     setEditingId(null);
@@ -442,18 +475,88 @@ export function ConsultantsManager({ initialConsultants }: ConsultantsManagerPro
                     className="w-full bg-slate-950 border border-slate-800 rounded-xl py-2.5 px-3.5 text-xs text-white focus:border-emerald-500 dir-ltr text-left"
                   />
                 </div>
+              </div>
 
-                <div>
-                  <label className="block text-xs font-semibold text-slate-300 mb-1.5">
-                    رابط الصورة الشخصية (URL)
+              {/* Consultant Avatar & Image Upload Section */}
+              <div className="p-4 rounded-2xl bg-slate-950/80 border border-slate-800 space-y-3">
+                <div className="flex items-center justify-between">
+                  <label className="block text-xs font-bold text-slate-200 flex items-center gap-1.5">
+                    <Upload className="w-4 h-4 text-emerald-400" />
+                    <span>صورة المستشار الشخصية</span>
                   </label>
-                  <input
-                    type="text"
-                    value={avatarUrl}
-                    onChange={(e) => setAvatarUrl(e.target.value)}
-                    placeholder="/images/consultants/alaa.jpg"
-                    className="w-full bg-slate-950 border border-slate-800 rounded-xl py-2.5 px-3.5 text-xs text-white focus:border-emerald-500 dir-ltr text-left"
-                  />
+                  <span className="text-[11px] text-emerald-400 font-medium">
+                    المقاس المناسب: 400 × 400 بكسل (مربع 1:1)
+                  </span>
+                </div>
+
+                <div className="flex flex-col sm:flex-row items-center gap-4">
+                  {/* Image Preview / Avatar Initials */}
+                  <div className="w-16 h-16 sm:w-20 sm:h-20 rounded-2xl bg-slate-900 border border-slate-800 flex items-center justify-center overflow-hidden shrink-0 shadow-inner relative group">
+                    {avatarUrl ? (
+                      <img
+                        src={avatarUrl}
+                        alt="صورة المستشار"
+                        className="w-full h-full object-cover"
+                      />
+                    ) : (
+                      <div className="text-slate-500 font-bold text-lg">
+                        {initials || name?.slice(0, 2) || 'صورة'}
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Upload Controls & URL Input */}
+                  <div className="flex-1 w-full space-y-2">
+                    <div className="flex items-center gap-2">
+                      <input
+                        type="file"
+                        ref={fileInputRef}
+                        onChange={handleImageUpload}
+                        accept="image/jpeg,image/png,image/webp,image/gif,image/svg+xml"
+                        className="hidden"
+                      />
+                      <button
+                        type="button"
+                        disabled={uploadingImage}
+                        onClick={() => fileInputRef.current?.click()}
+                        className="px-4 py-2 rounded-xl bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 text-xs font-bold flex items-center gap-1.5 transition-all cursor-pointer disabled:opacity-50"
+                      >
+                        {uploadingImage ? (
+                          <>
+                            <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                            <span>جاري رفع الصورة...</span>
+                          </>
+                        ) : (
+                          <>
+                            <Upload className="w-3.5 h-3.5" />
+                            <span>اختر وصوّر / ارفع صورة</span>
+                          </>
+                        )}
+                      </button>
+
+                      {avatarUrl && (
+                        <button
+                          type="button"
+                          onClick={() => setAvatarUrl('')}
+                          className="px-3 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-400 hover:text-red-400 text-xs transition-colors"
+                        >
+                          إزالة الصورة
+                        </button>
+                      )}
+                    </div>
+
+                    <input
+                      type="text"
+                      value={avatarUrl}
+                      onChange={(e) => setAvatarUrl(e.target.value)}
+                      placeholder="أو أدخل رابط الصورة مباشرة (URL)"
+                      className="w-full bg-slate-900 border border-slate-800 rounded-xl py-2 px-3 text-xs text-white focus:border-emerald-500 dir-ltr text-left"
+                    />
+
+                    <p className="text-[11px] text-slate-400 leading-relaxed">
+                      💡 <strong>تنبيه مقاس الصورة:</strong> يفضل استخدام صورة أبعادها <strong>400 × 400 بكسل</strong> (بنسبة 1:1) بحد أقصى 5 ميغابايت (JPG/PNG/WebP) لكي تظهر الصورة بشكل متناسق تماماً في كروت المستشارين وصفحة الحجز.
+                    </p>
+                  </div>
                 </div>
               </div>
 

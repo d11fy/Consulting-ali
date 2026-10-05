@@ -46,12 +46,6 @@ function LoginForm() {
     }
   };
 
-  const fillCredentials = (userEmail: string, userPass: string) => {
-    setEmail(userEmail);
-    setPassword(userPass);
-    setError(null);
-  };
-
   return (
     <div className="w-full max-w-md">
       {/* Brand header */}
@@ -133,29 +127,6 @@ function LoginForm() {
             )}
           </button>
         </form>
-
-        {/* Quick Login Assist (Development / Evaluation Mode) */}
-        <div className="mt-8 pt-6 border-t border-slate-800/80">
-          <p className="text-xs text-slate-400 mb-3 text-center">حسابات المعاينة المجهزة مسبقًا:</p>
-          <div className="grid grid-cols-2 gap-2 text-xs">
-            <button
-              type="button"
-              onClick={() => fillCredentials('admin@alihisham.com', 'Admin@123456')}
-              className="p-2.5 rounded-xl bg-slate-800/60 hover:bg-slate-800 text-slate-300 border border-slate-700/50 transition-all text-center"
-            >
-              <div className="font-semibold text-emerald-400">لوحة الإدارة</div>
-              <div className="text-[10px] text-slate-400 truncate">admin@alihisham.com</div>
-            </button>
-            <button
-              type="button"
-              onClick={() => fillCredentials('ali@alihisham.com', 'Consultant@123456')}
-              className="p-2.5 rounded-xl bg-slate-800/60 hover:bg-slate-800 text-slate-300 border border-slate-700/50 transition-all text-center"
-            >
-              <div className="font-semibold text-teal-400">لوحة المستشار</div>
-              <div className="text-[10px] text-slate-400 truncate">ali@alihisham.com</div>
-            </button>
-          </div>
-        </div>
       </div>
     </div>
   );
