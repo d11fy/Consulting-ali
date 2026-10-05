@@ -291,7 +291,16 @@ export function BookingTrackerClient({ booking, paymentMethods }: BookingTracker
               <div className="p-3.5 rounded-xl bg-slate-950 border border-slate-800">
                 <div className="text-slate-400 mb-1">الموعد المحدد:</div>
                 <div className="font-bold text-white text-sm font-mono dir-ltr text-right">
-                  {format(new Date(booking.slotStartTime), 'yyyy-MM-dd HH:mm')}
+                  {(() => {
+                    const d = new Date(booking.slotStartTime);
+                    const dStr = format(d, 'yyyy-MM-dd');
+                    let hours = d.getHours();
+                    const minutes = d.getMinutes().toString().padStart(2, '0');
+                    const period = hours >= 12 ? 'م' : 'ص';
+                    hours = hours % 12 || 12;
+                    const formattedHours = hours < 10 ? `0${hours}` : `${hours}`;
+                    return `${dStr} ${formattedHours}:${minutes} ${period}`;
+                  })()}
                 </div>
                 <div className="text-[11px] text-slate-400 mt-0.5">
                   المنطقة الزمنية: {booking.customerTimezone}

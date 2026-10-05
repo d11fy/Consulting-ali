@@ -2,11 +2,29 @@ import prisma from '@/lib/db/prisma';
 import { addMinutes, format, isAfter, isBefore, parse, startOfDay, endOfDay } from 'date-fns';
 import { toZonedTime, fromZonedTime } from 'date-fns-tz';
 
+export function formatTo12Hour(timeStr: string): string {
+  if (!timeStr) return '';
+  if (timeStr.includes('ص') || timeStr.includes('م') || timeStr.toLowerCase().includes('am') || timeStr.toLowerCase().includes('pm')) {
+    return timeStr;
+  }
+  const parts = timeStr.trim().split(':');
+  if (parts.length >= 2) {
+    let hours = parseInt(parts[0], 10);
+    const minutes = parts[1].substring(0, 2);
+    if (isNaN(hours)) return timeStr;
+    const period = hours >= 12 ? 'م' : 'ص';
+    hours = hours % 12 || 12;
+    const formattedHours = hours < 10 ? `0${hours}` : `${hours}`;
+    return `${formattedHours}:${minutes} ${period}`;
+  }
+  return timeStr;
+}
+
 export interface AvailableSlot {
   startTimeUtc: string; // ISO string in UTC
   endTimeUtc: string;   // ISO string in UTC
-  localStartTime: string; // HH:mm format in requested timezone
-  localEndTime: string;   // HH:mm format in requested timezone
+  localStartTime: string; // 12-hour format in requested timezone (e.g. 02:30 م)
+  localEndTime: string;   // 12-hour format in requested timezone
 }
 
 export async function getConsultantAvailableSlots(
@@ -173,8 +191,8 @@ export async function getConsultantAvailableSlots(
       availableSlots.push({
         startTimeUtc: currentSlotStart.toISOString(),
         endTimeUtc: currentSlotEnd.toISOString(),
-        localStartTime: format(localStart, 'HH:mm'),
-        localEndTime: format(localEnd, 'HH:mm'),
+        localStartTime: formatTo12Hour(format(localStart, 'HH:mm')),
+        localEndTime: formatTo12Hour(format(localEnd, 'HH:mm')),
       });
     }
 
