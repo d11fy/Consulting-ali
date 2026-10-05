@@ -22,16 +22,20 @@ export const dynamic = 'force-dynamic';
 export default async function ConsultantProfilePage({
   params,
 }: {
-  params: Promise<{ id: string }>;
+  params: Promise<{ id: string }> | { id: string };
 }) {
-  const { id } = await params;
+  const resolvedParams = await Promise.resolve(params);
+  const rawId = resolvedParams?.id || '';
+  const decodedId = decodeURIComponent(rawId);
+
   const session = await getCurrentSession();
 
   const consultant = await prisma.consultant.findFirst({
     where: {
       OR: [
-        { id: id },
-        { slug: id },
+        { id: rawId },
+        { slug: rawId },
+        { slug: decodedId },
       ],
     },
     include: {
@@ -45,15 +49,6 @@ export default async function ConsultantProfilePage({
     },
   });
 
-  if (!consultant) {
-    notFound();
-  }
-
-  const allServices = await prisma.service.findMany({
-    where: { isActive: true },
-    orderBy: { orderIndex: 'asc' },
-  });
-
   const settings = await prisma.siteSetting.findMany();
   const settingsMap = new Map(settings.map((s) => [s.key, s.value]));
 
@@ -61,6 +56,37 @@ export default async function ConsultantProfilePage({
   const instagramAliHisham = settingsMap.get('instagram_ali_hisham') || 'https://www.instagram.com/ali_hisham.eu';
   const instagramMasarat = settingsMap.get('instagram_masarat_study') || 'https://www.instagram.com/masarat.study';
   const legalDisclaimer = settingsMap.get('legal_disclaimer') || '';
+
+  if (!consultant || !consultant.user) {
+    return (
+      <div className="min-h-screen flex flex-col bg-slate-950 text-slate-100 font-sans" dir="rtl">
+        <Navbar userRole={session?.role || null} />
+        <main className="flex-1 flex flex-col items-center justify-center p-8 text-center space-y-4">
+          <div className="w-16 h-16 rounded-3xl bg-slate-900 border border-slate-800 flex items-center justify-center text-slate-400">
+            <Briefcase className="w-8 h-8 text-emerald-400" />
+          </div>
+          <h1 className="text-2xl font-bold text-white">ملف المستشار غير متوفر</h1>
+          <p className="text-xs text-slate-400 max-w-md">
+            لم نتمكن من العثور على ملف هذا المستشار، يرجى العودة للرئيسية لاختيار المستشار المناسب.
+          </p>
+          <Link href="/" className="px-6 py-3 rounded-2xl bg-gradient-to-r from-emerald-500 to-teal-500 text-slate-950 font-bold text-xs shadow-lg">
+            العودة للصفحة الرئيسية
+          </Link>
+        </main>
+        <Footer
+          legalDisclaimer={legalDisclaimer}
+          instagramAliHisham={instagramAliHisham}
+          instagramMasarat={instagramMasarat}
+          whatsappNumber={whatsappNumber}
+        />
+      </div>
+    );
+  }
+
+  const allServices = await prisma.service.findMany({
+    where: { isActive: true },
+    orderBy: { orderIndex: 'asc' },
+  });
 
   const displayInitials = consultant.initials || consultant.user.name.split(' ').slice(0, 2).map((w) => w[0]).join('');
   const displayTags = (consultant.tags && consultant.tags.length > 0)
