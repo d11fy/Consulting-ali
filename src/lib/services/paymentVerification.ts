@@ -165,9 +165,13 @@ export async function confirmBookingPayment({
       id: updatedBooking.id,
       reference: updatedBooking.bookingReference,
       customerName: updatedBooking.customer.fullName,
+      customerPhone: updatedBooking.customer.whatsappPhone,
       serviceName: updatedBooking.service.nameAr,
       consultantName: updatedBooking.consultant?.user.name || 'أ. علي هشام',
+      amount: updatedBooking.service.price,
+      slotStartTime: updatedBooking.slotStartTime.toISOString(),
       meetingLink: meetLink || undefined,
+      consultantTelegramChatId: updatedBooking.consultant?.telegramChatId || undefined,
     });
   } catch (err) {
     console.error('Telegram confirmation failed non-fatally:', err);

@@ -223,10 +223,13 @@ export async function createNewBooking(input: CreateBookingInput) {
         id: booking.id,
         reference: booking.bookingReference,
         customerName: input.fullName,
+        customerPhone: input.whatsappPhone,
+        customerCountry: input.country,
         serviceName: service.nameAr,
         amount: service.price,
-        consultantName: consultant?.user?.name || 'توجيه تلقائي',
+        consultantName: consultant?.user?.name || 'توجيه تلقائي (المستشار الأنسب)',
         slotStartTime: startTime.toISOString(),
+        consultantTelegramChatId: consultant?.telegramChatId,
       });
     } catch (tgErr) {
       console.error('Failed to send telegram notification for new booking:', tgErr);

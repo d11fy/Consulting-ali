@@ -211,7 +211,11 @@ export async function POST(
           senderName,
           amount,
           currency,
+          serviceName: payment.booking.service.nameAr,
+          consultantName: payment.booking.consultant?.user?.name,
+          slotStartTime: payment.booking.slotStartTime.toISOString(),
           transactionNumber: transactionNumber || undefined,
+          consultantTelegramChatId: payment.booking.consultant?.telegramChatId,
         });
       } catch (tgErr) {
         console.error('Failed to send telegram notification for payment proof:', tgErr);

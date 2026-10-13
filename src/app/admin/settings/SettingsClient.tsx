@@ -63,7 +63,11 @@ export function SettingsClient({ initialSettings }: SettingsClientProps) {
       const res = await fetch('/api/admin/settings', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ action: 'test_telegram' }),
+        body: JSON.stringify({
+          action: 'test_telegram',
+          token: settings['telegram_bot_token'] || '',
+          chatId: settings['telegram_chat_id'] || '',
+        }),
       });
       const data = await res.json();
       if (res.ok && data.success) {
@@ -178,10 +182,15 @@ export function SettingsClient({ initialSettings }: SettingsClientProps) {
       {/* 2. Telegram Bot Integration */}
       <div className="bg-slate-900/80 backdrop-blur-xl border border-slate-800 rounded-3xl p-6 sm:p-8 space-y-6">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-          <h3 className="text-base font-bold text-white flex items-center gap-2">
-            <TelegramIcon className="w-5 h-5 text-blue-400" />
-            <span>ربط بوت تيليغرام (Telegram Notifications)</span>
-          </h3>
+          <div>
+            <h3 className="text-base font-bold text-white flex items-center gap-2">
+              <TelegramIcon className="w-5 h-5 text-blue-400" />
+              <span>ربط بوت تيليغرام (Telegram Notifications)</span>
+            </h3>
+            <p className="text-xs text-slate-400 mt-1">
+              تصلك هنا كافة إشعارات الحجوزات لجميع المستشارين، إثباتات الدفع، والاعتمادات فور حدوثها.
+            </p>
+          </div>
           <button
             type="button"
             disabled={testingTelegram}
@@ -191,6 +200,21 @@ export function SettingsClient({ initialSettings }: SettingsClientProps) {
             {testingTelegram ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Send className="w-3.5 h-3.5" />}
             <span>اختبار إرسال إشعار Telegram</span>
           </button>
+        </div>
+
+        <div className="p-4 rounded-2xl bg-blue-950/30 border border-blue-500/20 text-xs text-blue-300 space-y-1.5 leading-relaxed">
+          <p className="font-semibold text-blue-200 flex items-center gap-1.5">
+            <span>💡 خطوات الربط الصحيح لضمان وصول الإشعارات:</span>
+          </p>
+          <ul className="list-disc list-inside space-y-1 text-slate-300">
+            <li>أنشئ بوتاً عبر <b>@BotFather</b> في تيليجرام وانسخ رمز <b>Bot Token</b>.</li>
+            <li>
+              <span className="text-amber-300 font-bold">ضروري جداً:</span> افتح محادثة البوت الخاص بك في تيليجرام واضغط زر <b>(Start / ابدأ)</b> أولاً، لكي يتمكن البوت من مراسلتك.
+            </li>
+            <li>
+              أرسل رسالة للبوت <b>@userinfobot</b> لمعرفة الـ <b>Chat ID</b> الخاص بك (رقم فقط مثل <code>123456789</code> وليس اسم مستخدم @).
+            </li>
+          </ul>
         </div>
 
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-xs">
@@ -203,17 +227,19 @@ export function SettingsClient({ initialSettings }: SettingsClientProps) {
               placeholder="123456789:ABCdefGhI..."
               className="w-full bg-slate-950 border border-slate-800 rounded-xl p-3 text-slate-200 dir-ltr text-left font-mono"
             />
+            <p className="text-[11px] text-slate-500 mt-1">رمز توكن البوت الصادر من @BotFather</p>
           </div>
 
           <div>
-            <label className="block text-slate-300 font-semibold mb-2">Chat ID</label>
+            <label className="block text-slate-300 font-semibold mb-2">Chat ID (معرف المحادثة الرقمي)</label>
             <input
               type="text"
               value={settings['telegram_chat_id'] || ''}
               onChange={(e) => handleChange('telegram_chat_id', e.target.value)}
-              placeholder="-100123456789"
+              placeholder="123456789"
               className="w-full bg-slate-950 border border-slate-800 rounded-xl p-3 text-slate-200 dir-ltr text-left font-mono"
             />
+            <p className="text-[11px] text-slate-500 mt-1">رقم المعرف الشخصي من @userinfobot (وليس اسم المستخدم @)</p>
           </div>
         </div>
       </div>

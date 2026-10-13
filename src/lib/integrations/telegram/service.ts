@@ -5,14 +5,45 @@ export interface TelegramButton {
   url: string;
 }
 
+function getBaseAppUrl(): string {
+  const envUrl = process.env.NEXT_PUBLIC_APP_URL || process.env.APP_URL;
+  if (envUrl && !envUrl.includes('localhost') && !envUrl.includes('127.0.0.1')) {
+    return envUrl.replace(/\/+$/, '');
+  }
+  return 'https://ali.masart.study';
+}
+
+function formatArabicDateTime(dateStr: string): string {
+  try {
+    const d = new Date(dateStr);
+    return new Intl.DateTimeFormat('ar-EG', {
+      weekday: 'long',
+      year: 'numeric',
+      month: 'long',
+      day: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit',
+      hour12: true,
+      timeZone: 'Asia/Gaza',
+    }).format(d);
+  } catch {
+    return dateStr;
+  }
+}
+
 export async function getTelegramConfig() {
   const settings = await prisma.siteSetting.findMany({
-    where: { category: 'telegram' },
+    where: {
+      OR: [
+        { category: 'telegram' },
+        { key: { in: ['telegram_bot_token', 'telegram_chat_id', 'telegram_enabled'] } },
+      ],
+    },
   });
   const map = new Map(settings.map((s) => [s.key, s.value]));
 
-  const token = map.get('telegram_bot_token') || process.env.TELEGRAM_BOT_TOKEN || '';
-  const chatId = map.get('telegram_chat_id') || process.env.TELEGRAM_CHAT_ID || '';
+  const token = (map.get('telegram_bot_token') || process.env.TELEGRAM_BOT_TOKEN || '').trim();
+  const chatId = (map.get('telegram_chat_id') || process.env.TELEGRAM_CHAT_ID || '').trim();
   const isEnabled = map.get('telegram_enabled') !== 'false';
 
   return { token, chatId, isEnabled };
@@ -21,11 +52,14 @@ export async function getTelegramConfig() {
 export async function sendTelegramMessage(
   text: string,
   buttons?: TelegramButton[],
-  customChatId?: string
+  customChatId?: string,
+  customToken?: string
 ): Promise<{ success: boolean; error?: string }> {
   try {
-    const { token, chatId, isEnabled } = await getTelegramConfig();
-    const targetChatId = customChatId || chatId;
+    const config = await getTelegramConfig();
+    const token = (customToken || config.token).trim();
+    const targetChatId = (customChatId || config.chatId).trim();
+    const isEnabled = config.isEnabled;
 
     if (!isEnabled || !token || !targetChatId) {
       console.log('Telegram notifications not configured or disabled.');
@@ -38,10 +72,15 @@ export async function sendTelegramMessage(
       parse_mode: 'HTML',
     };
 
-    if (buttons && buttons.length > 0) {
+    // Filter valid URLs (Telegram rejects localhost and invalid URLs in buttons)
+    const validButtons = (buttons || []).filter(
+      (b) => b.url && (b.url.startsWith('https://') || b.url.startsWith('http://'))
+    );
+
+    if (validButtons.length > 0) {
       payload.reply_markup = {
         inline_keyboard: [
-          buttons.map((b) => ({ text: b.text, url: b.url })),
+          validButtons.map((b) => ({ text: b.text, url: b.url })),
         ],
       };
     }
@@ -55,6 +94,22 @@ export async function sendTelegramMessage(
     const result = await response.json();
     if (!result.ok) {
       console.error('Telegram API error:', result.description);
+
+      // If Telegram rejected due to buttons (e.g. BUTTON_URL_INVALID), retry without buttons
+      if (payload.reply_markup) {
+        const retryPayload = { ...payload };
+        delete retryPayload.reply_markup;
+        const retryRes = await fetch(`https://api.telegram.org/bot${token}/sendMessage`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(retryPayload),
+        });
+        const retryResult = await retryRes.json();
+        if (retryResult.ok) {
+          return { success: true };
+        }
+      }
+
       return { success: false, error: result.description };
     }
 
@@ -69,30 +124,50 @@ export async function notifyNewBookingTelegram(booking: {
   id: string;
   reference: string;
   customerName: string;
+  customerPhone?: string;
+  customerCountry?: string;
   serviceName: string;
   amount: number;
   consultantName?: string;
   slotStartTime: string;
+  consultantTelegramChatId?: string | null;
 }) {
-  const appUrl = process.env.APP_URL || 'http://localhost:3000';
+  const appUrl = getBaseAppUrl();
+  const formattedTime = formatArabicDateTime(booking.slotStartTime);
+
   const text = `
-<b>🔔 حجز استشارة جديد بانتظار الدفع</b>
+🔔 <b>حجز استشارة جديد على المنصة!</b>
 
-<b>الرقم المرجعي:</b> <code>${booking.reference}</code>
-<b>العميل:</b> ${booking.customerName}
-<b>الخدمة:</b> ${booking.serviceName}
-<b>المستشار:</b> ${booking.consultantName || 'المستشار الأنسب (تلقائي)'}
-<b>المبلغ المطلوب:</b> $${booking.amount} USD
-<b>الموعد:</b> ${new Date(booking.slotStartTime).toLocaleString('ar-EG')}
+📌 <b>نوع الاستشارة:</b> ${booking.serviceName}
+🔢 <b>الرقم المرجعي:</b> <code>${booking.reference}</code>
+👤 <b>اسم العميل:</b> ${booking.customerName}
+${booking.customerPhone ? `📱 <b>رقم واتساب:</b> <code>${booking.customerPhone}</code>\n` : ''}${booking.customerCountry ? `🌍 <b>الدولة:</b> ${booking.customerCountry}\n` : ''}👨‍💼 <b>المستشار:</b> ${booking.consultantName || 'المستشار الأنسب (توجيه تلقائي)'}
+💰 <b>الدفع:</b> $${booking.amount} USD (بانتظار التحويل)
+📅 <b>الموعد المحدد:</b> ${formattedTime}
 
-<i>الحجز بانتظار تحويل العميل ورفع إشعار الدفع.</i>
+⚡ <i>الحجز مسجل وبانتظار تحويل العميل ورفع إشعار الدفع للاعتماد.</i>
   `.trim();
 
   const buttons: TelegramButton[] = [
-    { text: 'عرض الحجز في الإدارة', url: `${appUrl}/admin/bookings/${booking.id}` },
+    { text: 'عرض تفاصيل الحجز بالإدارة 🔗', url: `${appUrl}/admin/bookings/${booking.id}` },
   ];
 
-  return sendTelegramMessage(text, buttons);
+  // Send to platform Admin
+  const adminResult = await sendTelegramMessage(text, buttons);
+
+  // If the assigned consultant has their own Telegram Chat ID, send them a copy
+  if (
+    booking.consultantTelegramChatId &&
+    booking.consultantTelegramChatId.trim().length > 0
+  ) {
+    try {
+      await sendTelegramMessage(text, buttons, booking.consultantTelegramChatId.trim());
+    } catch (cErr) {
+      console.error('Failed to notify consultant on their individual telegram chat ID:', cErr);
+    }
+  }
+
+  return adminResult;
 }
 
 export async function notifyPaymentProofTelegram(booking: {
@@ -102,46 +177,86 @@ export async function notifyPaymentProofTelegram(booking: {
   senderName: string;
   amount: number;
   currency: string;
+  serviceName?: string;
+  consultantName?: string;
+  slotStartTime?: string;
   transactionNumber?: string;
+  consultantTelegramChatId?: string | null;
 }) {
-  const appUrl = process.env.APP_URL || 'http://localhost:3000';
-  const text = `
-<b>💳 إشعار دفع جديد بانتظار المراجعة والاعتماد!</b>
+  const appUrl = getBaseAppUrl();
+  const formattedTime = booking.slotStartTime ? formatArabicDateTime(booking.slotStartTime) : null;
 
-<b>الرقم المرجعي:</b> <code>${booking.reference}</code>
-<b>العميل:</b> ${booking.customerName}
-<b>اسم المحول:</b> ${booking.senderName}
-<b>المبلغ المحول:</b> ${booking.amount} ${booking.currency}
-${booking.transactionNumber ? `<b>رقم الحوالة:</b> <code>${booking.transactionNumber}</code>\n` : ''}
-⚡ <b>يرجى مراجعة الإيصال واعتماد الحجز لإنشاء رابط الجلسة ومزامنة التقويم.</b>
+  const text = `
+💳 <b>إشعار دفع جديد بانتظار المراجعة والاعتماد!</b>
+
+${booking.serviceName ? `📌 <b>نوع الاستشارة:</b> ${booking.serviceName}\n` : ''}🔢 <b>الرقم المرجعي:</b> <code>${booking.reference}</code>
+👤 <b>اسم العميل:</b> ${booking.customerName}
+${booking.consultantName ? `👨‍💼 <b>المستشار:</b> ${booking.consultantName}\n` : ''}💵 <b>المبلغ المحول:</b> ${booking.amount} ${booking.currency}
+👤 <b>اسم المحول:</b> ${booking.senderName}
+${booking.transactionNumber ? `🧾 <b>رقم الحوالة:</b> <code>${booking.transactionNumber}</code>\n` : ''}${formattedTime ? `📅 <b>موعد الجلسة:</b> ${formattedTime}\n` : ''}
+⚡ <b>يرجى مراجعة إيصال التحويل واعتماد الحجز لإنشاء رابط الاجتماع ومزامنة التقويم فورًا.</b>
   `.trim();
 
   const buttons: TelegramButton[] = [
-    { text: 'مراجعة الدفع الآن', url: `${appUrl}/admin/bookings/${booking.id}` },
+    { text: 'مراجعة الدفع والاعتماد الآن 💳', url: `${appUrl}/admin/bookings/${booking.id}` },
   ];
 
-  return sendTelegramMessage(text, buttons);
+  const adminResult = await sendTelegramMessage(text, buttons);
+
+  if (booking.consultantTelegramChatId && booking.consultantTelegramChatId.trim().length > 0) {
+    try {
+      await sendTelegramMessage(text, buttons, booking.consultantTelegramChatId.trim());
+    } catch (cErr) {
+      console.error('Failed to notify consultant on payment proof telegram:', cErr);
+    }
+  }
+
+  return adminResult;
 }
 
 export async function notifyPaymentConfirmedTelegram(booking: {
   id: string;
   reference: string;
   customerName: string;
+  customerPhone?: string;
   serviceName: string;
   consultantName: string;
+  amount?: number;
+  slotStartTime?: string;
   meetingLink?: string;
+  consultantTelegramChatId?: string | null;
 }) {
-  const text = `
-<b>✅ تم اعتماد الدفع وتأكيد الحجز بنجاح</b>
+  const appUrl = getBaseAppUrl();
+  const formattedTime = booking.slotStartTime ? formatArabicDateTime(booking.slotStartTime) : null;
 
-<b>الرقم المرجعي:</b> <code>${booking.reference}</code>
-<b>العميل:</b> ${booking.customerName}
-<b>الخدمة:</b> ${booking.serviceName}
-<b>المستشار:</b> ${booking.consultantName}
-${booking.meetingLink ? `<b>رابط الاجتماع:</b> ${booking.meetingLink}` : ''}
+  const text = `
+✅ <b>تم اعتماد الدفع وتأكيد الحجز بنجاح!</b>
+
+📌 <b>نوع الاستشارة:</b> ${booking.serviceName}
+🔢 <b>الرقم المرجعي:</b> <code>${booking.reference}</code>
+👤 <b>العميل:</b> ${booking.customerName}
+${booking.customerPhone ? `📱 <b>رقم واتساب:</b> <code>${booking.customerPhone}</code>\n` : ''}👨‍💼 <b>المستشار:</b> ${booking.consultantName}
+${booking.amount ? `💰 <b>المبلغ المؤكد:</b> $${booking.amount} USD\n` : ''}${formattedTime ? `📅 <b>الموعد المؤكد:</b> ${formattedTime}\n` : ''}${booking.meetingLink ? `🔗 <b>رابط الاجتماع (Google Meet):</b> ${booking.meetingLink}\n` : ''}
+🎉 <b>تم تحديث حالة الحجز ومزامنة الموعد في التقويم بنجاح.</b>
   `.trim();
 
-  return sendTelegramMessage(text);
+  const buttons: TelegramButton[] = [];
+  if (booking.meetingLink) {
+    buttons.push({ text: 'دخول الاجتماع 🎥', url: booking.meetingLink });
+  }
+  buttons.push({ text: 'عرض تفاصيل الحجز 📄', url: `${appUrl}/admin/bookings/${booking.id}` });
+
+  const adminResult = await sendTelegramMessage(text, buttons);
+
+  if (booking.consultantTelegramChatId && booking.consultantTelegramChatId.trim().length > 0) {
+    try {
+      await sendTelegramMessage(text, buttons, booking.consultantTelegramChatId.trim());
+    } catch (cErr) {
+      console.error('Failed to notify consultant on payment confirmed telegram:', cErr);
+    }
+  }
+
+  return adminResult;
 }
 
 export async function notifyConsultantUpcomingSessionTelegram(data: {
@@ -153,6 +268,7 @@ export async function notifyConsultantUpcomingSessionTelegram(data: {
   minutesRemaining: number;
   telegramChatId?: string | null;
 }) {
+  const formattedTime = formatArabicDateTime(data.slotStartTime);
   const text = `
 ⏰ <b>تنبيه موعد استشارة قادمة</b>
 
@@ -161,7 +277,7 @@ export async function notifyConsultantUpcomingSessionTelegram(data: {
 
 👤 <b>العميل:</b> ${data.customerName}
 📋 <b>الخدمة:</b> ${data.serviceName}
-🕒 <b>الموعد:</b> ${new Date(data.slotStartTime).toLocaleString('ar-EG')}
+🕒 <b>الموعد:</b> ${formattedTime}
 ${data.meetingLink ? `🔗 <b>رابط Google Meet:</b> ${data.meetingLink}` : ''}
 
 يرجى فتح غرفة الاجتماع والتأكد من الجاهزية.
